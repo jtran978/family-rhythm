@@ -1,7 +1,7 @@
 {
   "name": "Family Rhythm",
   "short_name": "Our Rhythm",
-  "description": "A gentle family tracker for weigh-ins, food, chores, and photo rewards.",
+  "description": "A gentle family tracker for weigh-ins, chores, bills, recipes, and photo rewards.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

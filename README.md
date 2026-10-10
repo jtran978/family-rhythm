@@ -27,7 +27,7 @@ Deploy the function once: Supabase dashboard > Edge Functions > Deploy a new fun
 
 ## Photo PIN
 
-The photo library is locked behind a PIN that's checked in the database: storage won't list or serve photos until the PIN is entered, and it locks again after 15 minutes, when you leave the Photos tab, or when the app goes to the background. Five wrong tries locks it for 15 minutes. A fresh weigh-in still reveals one random photo without the PIN.
+The photo library is locked behind a PIN that's checked in the database: storage won't list or serve photos until the PIN is entered, and it locks again after 15 minutes, when you leave the Photos tab, or when the app goes to the background. Five wrong tries locks it for 15 minutes. Changing the PIN needs the current PIN. A weigh-in, a finished chore or a paid bill each reveal one random photo without the PIN (one per event).
 
 Forgot the PIN? In Supabase SQL Editor run `update public.photo_lock set pin_hash = null;`, then set a new one in the app.
 

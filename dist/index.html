@@ -154,11 +154,12 @@
     </section>
 
     <section id="photos" class="view" aria-labelledby="photos-title">
-      <div class="page-heading"><p class="eyebrow">The good stuff</p><h2 id="photos-title">Photo rewards</h2><p>Favorite family pictures, kept behind a PIN. One is revealed after each Monday or Friday weigh-in.</p></div>
+      <div class="page-heading"><p class="eyebrow">The good stuff</p><h2 id="photos-title">Photo rewards</h2><p>Favorite family pictures, kept behind a PIN. One is revealed after each weigh-in, finished chore or paid bill.</p></div>
       <form id="pinForm" class="entry-form pin-form" hidden>
         <div class="gate-mark" aria-hidden="true">🔒</div>
         <strong id="pinTitle">Enter the photo PIN</strong>
         <small id="pinHint" class="muted"></small>
+        <input id="pinCurrent" type="password" inputmode="numeric" pattern="[0-9]{4,8}" minlength="4" maxlength="8" autocomplete="off" aria-label="Current PIN" placeholder="Current PIN" hidden />
         <input id="pinInput" type="password" inputmode="numeric" pattern="[0-9]{4,8}" minlength="4" maxlength="8" autocomplete="off" required aria-label="PIN" placeholder="PIN" />
         <input id="pinConfirm" type="password" inputmode="numeric" pattern="[0-9]{4,8}" minlength="4" maxlength="8" autocomplete="off" aria-label="Type the PIN again" placeholder="Type it again" hidden />
         <p id="pinError" class="form-error" hidden></p>
@@ -287,10 +288,11 @@
 
   <div id="reward" class="reward" hidden>
     <div class="reward-card">
-      <p class="eyebrow">You showed up ♡</p>
+      <p class="eyebrow" id="rewardEyebrow">You showed up ♡</p>
       <h2>Here’s a little joy.</h2>
+      <p id="rewardMessage" class="reward-message" hidden></p>
       <img id="rewardImage" alt="A family photo reward" />
-      <div id="rewardEmpty" hidden><div class="empty-heart">♡</div><p>Add family photos to make the next check-in extra sweet.</p></div>
+      <div id="rewardEmpty" hidden><div class="empty-heart">♡</div><p>No family photos yet. Rewards will show up here once some are added.</p></div>
       <button id="closeReward" class="primary full">Done</button>
     </div>
   </div>

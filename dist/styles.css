@@ -102,3 +102,6 @@ dialog.sheet{max-width:640px;width:calc(100% - 20px);max-height:calc(100dvh - 30
 .recipe-actions{margin-top:18px}
 .danger-text{color:#9e4a45}
 #recipeEditForm textarea{width:100%;border:1px solid var(--line);border-radius:12px;padding:12px;font:inherit;resize:vertical}
+
+/* ---- weigh-in encouragement ---- */
+.reward-message{margin:-6px 0 16px;line-height:1.5;color:var(--ink);font-size:16px}

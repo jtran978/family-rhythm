@@ -224,7 +224,7 @@ function renderChores() {
     const chore = data.chores.find(x => x.id === b.dataset.toggleChore);
     const done = !chore.done;
     const { error } = await sb.from('chores').update({ done, done_by: done ? me.id : null, done_at: done ? new Date().toISOString() : null }).eq('id', chore.id);
-    if (!oops(error)) { if (done) toast('Nice. One less thing.'); refresh(); }
+    if (!oops(error)) { if (done) { toast('Nice. One less thing.'); showReward('chore', chore.id); } refresh(); }
   });
   $$('[data-delete-chore]').forEach(b => b.onclick = async () => {
     const { error } = await sb.from('chores').delete().eq('id', b.dataset.deleteChore);
@@ -376,7 +376,7 @@ function openPayForm(bill) {
 $('#payForm').onsubmit = async e => {
   e.preventDefault();
   if (cancelled(e)) return;
-  const { error } = await sb.rpc('pay_bill', {
+  const { data: paymentId, error } = await sb.rpc('pay_bill', {
     bill: payingBill.id,
     amount: $('#payAmount').value === '' ? null : Number($('#payAmount').value),
     paid_on: $('#payDate').value,
@@ -385,6 +385,7 @@ $('#payForm').onsubmit = async e => {
   if (oops(error, 'Couldn’t save that payment')) return;
   $('#payDialog').close();
   toast(`${payingBill.name} marked paid`);
+  showReward('bill', paymentId);
   refresh();
 };
 
@@ -549,24 +550,109 @@ $('#weighForm').onsubmit = async e => {
   if (cancelled(e)) return;
   const unit = $('#weightUnit').value;
   store.set(`fr-unit-${me.id}`, unit);
-  const { error } = await sb.from('weigh_ins').upsert(
+  const cheer = weighCheer(Number($('#weightValue').value), unit);
+  const { data: saved, error } = await sb.from('weigh_ins').upsert(
     { profile_id: me.id, date: dateKey(), value: Number($('#weightValue').value), unit },
     { onConflict: 'profile_id,date' }
-  );
+  ).select('id').single();
   if (oops(error, 'Couldn’t save your weigh-in')) return;
   $('#weighDialog').close();
-  showReward();
+  showReward('weigh_in', saved?.id, cheer);
   refresh();
 };
 
-// A fresh weigh-in earns one random photo for a couple of minutes, no PIN needed.
-async function showReward() {
+// ---------- weigh-in encouragement ----------
+// Compares with the last weigh-in before today. {d} is the change, {when} is when that was.
+// Ups get no number on purpose: the point is to keep showing up.
+const CHEERS = {
+  first: [
+    'Your first check-in! Every journey starts with one step.',
+    'Day one is done. So glad you’re here.',
+    'First weigh-in logged. This is your starting line, and you showed up for it.',
+    'You started. That’s honestly the hardest part.'
+  ],
+  down: [
+    'Down {d} since {when}. Your consistency is paying off.',
+    '{d} lighter than last time. Small steps really do add up.',
+    'Look at that: down {d}. Be proud of the work behind it.',
+    'Down {d}. The habits you’re building are working.',
+    'Progress! {d} down since {when}. Keep being kind to yourself.',
+    'Down {d}. That’s what showing up looks like.',
+    '{d} down. Take a second to celebrate. You earned it.',
+    'Moving in the right direction: down {d} since {when}.',
+    'Down {d}. Steady and patient wins this one.',
+    'Nice work, {d} down. Your future self says thank you.',
+    'Down {d}! All those little choices are adding up.',
+    '{d} down since {when}. You should feel really good about that.'
+  ],
+  up: [
+    'Bodies go up and down: water, salt, sleep, stress. You still showed up, and that counts most.',
+    'One number doesn’t define a week. The trend matters more than any single day.',
+    'A little up today, and that’s okay. Checking in on a harder day takes real strength.',
+    'Up a bit, which is completely normal. Be gentle with yourself and keep going.',
+    'Ups and downs are part of every journey. You’re still on your path.',
+    'Today’s number is information, not a grade. Proud of you for stepping on.',
+    'Up slightly. Drink some water, get some rest, and keep doing what feels good.',
+    'Every road has a few bumps. You’re here, and that’s the win.',
+    'Don’t let one weigh-in steal your momentum. You’ve got this.',
+    'Scales wobble. Your effort doesn’t. Keep going.',
+    'Not every check-in goes down, and that’s fine. Showing up anyway is how it works.',
+    'A small bump, not a step back. Tomorrow is a fresh start.'
+  ],
+  same: [
+    'Holding steady. Consistency is a superpower.',
+    'Right where you were, and steady is progress too.',
+    'Steady as you go. Keeping it level takes real effort.',
+    'No big change, and that’s just fine. Keep showing up.',
+    'A steady week. Your routine is holding strong.',
+    'Holding the line. Small habits make big results over time.',
+    'Same as last time. Consistent is exactly what you want to be.'
+  ]
+};
+
+// Works through each list in a shuffled order, so no message repeats until all have been seen.
+function pickCheer(kind) {
+  const key = `fr-cheer-${me.id}-${kind}`;
+  const pool = CHEERS[kind];
+  let deck;
+  try { deck = JSON.parse(store.get(key)); } catch { deck = null; }
+  if (!Array.isArray(deck) || !deck.length || deck.some(i => !(i in pool))) {
+    deck = pool.map((_, i) => i);
+    for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
+    // Don't start the new round with the message that ended the last one.
+    if (deck.length > 1 && deck[0] === Number(store.get(`${key}-last`))) deck.push(deck.shift());
+  }
+  const i = deck.shift();
+  store.set(key, JSON.stringify(deck));
+  store.set(`${key}-last`, String(i));
+  return pool[i];
+}
+
+function weighCheer(value, unit) {
+  const prev = data.weights.find(w => w.date < dateKey());
+  if (!prev) return pickCheer('first');
+  const prevValue = Number(prev.value) * (prev.unit === unit ? 1 : unit === 'kg' ? 1 / 2.20462 : 2.20462);
+  const delta = value - prevValue;
+  const kind = Math.abs(delta) < (unit === 'kg' ? 0.2 : 0.4) ? 'same' : delta < 0 ? 'down' : 'up';
+  const days = daysUntil(prev.date) * -1;
+  const when = days <= 6 ? new Date(`${prev.date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long' }) : 'last time';
+  return pickCheer(kind).replace('{d}', `${Math.abs(delta).toFixed(1)} ${unit}`).replace('{when}', when);
+}
+
+// A weigh-in, finished chore or paid bill earns one random photo for a couple of minutes,
+// no PIN needed. The database allows one per event. Chores and bills only pop up when there's a photo.
+const REWARD_TITLES = { weigh_in: 'You showed up ♡', chore: 'Chore done ♡', bill: 'Bill paid ♡' };
+async function showReward(kind, eventId, message = '') {
   const img = $('#rewardImage'), empty = $('#rewardEmpty');
-  img.hidden = true; empty.hidden = true;
-  $('#reward').hidden = false;
-  const { data: path } = await sb.rpc('grant_reward');
+  $('#rewardMessage').textContent = message;
+  $('#rewardMessage').hidden = !message;
+  const { data: path } = eventId ? await sb.rpc('grant_reward', { kind, event: eventId }) : { data: null };
   const signed = path ? (await sb.storage.from('photos').createSignedUrl(path, 120)).data : null;
-  if (signed?.signedUrl) { img.src = signed.signedUrl; img.hidden = false; } else empty.hidden = false;
+  if (!signed?.signedUrl && kind !== 'weigh_in') return;
+  $('#rewardEyebrow').textContent = REWARD_TITLES[kind];
+  img.hidden = !signed?.signedUrl; empty.hidden = !!signed?.signedUrl;
+  if (signed?.signedUrl) img.src = signed.signedUrl;
+  $('#reward').hidden = false;
 }
 $('#closeReward').onclick = () => { $('#reward').hidden = true; };
 
@@ -592,9 +678,14 @@ function showPinForm(mode) {
   $('#pinTitle').textContent = { unlock: 'Enter the photo PIN', create: 'Create a photo PIN', change: 'Choose a new photo PIN' }[mode];
   $('#pinHint').textContent = mode === 'unlock'
     ? 'Photos lock again when you leave this tab.'
-    : '4 to 8 digits. Anyone who wants to browse the photos will need it.';
+    : mode === 'create'
+      ? '4 to 8 digits. Only someone with this PIN can browse the photos or change the PIN.'
+      : 'Enter the current PIN, then the new one twice.';
   $('#pinConfirm').hidden = mode === 'unlock';
   $('#pinConfirm').required = mode !== 'unlock';
+  $('#pinCurrent').hidden = mode !== 'change';
+  $('#pinCurrent').required = mode === 'change';
+  $('#pinInput').placeholder = mode === 'unlock' ? 'PIN' : 'New PIN';
   $('#pinSubmit').textContent = mode === 'unlock' ? 'Unlock' : 'Save PIN';
   $('#pinCancel').hidden = mode !== 'change';
   $('#pinError').hidden = true;
@@ -634,8 +725,12 @@ $('#pinForm').onsubmit = async e => {
     return pinError(result === 'locked_out' ? 'Too many tries. Photos are locked for 15 minutes.' : 'That PIN didn’t match.');
   }
   if (pin !== $('#pinConfirm').value) return pinError('Those two PINs don’t match.');
-  const { error } = await sb.rpc('set_photo_pin', { new_pin: pin });
+  const { data: result, error } = await sb.rpc('set_photo_pin', { new_pin: pin, current_pin: pinMode === 'change' ? $('#pinCurrent').value : null });
   if (oops(error, 'Couldn’t save the PIN')) return;
+  if (result !== 'ok') {
+    $('#pinCurrent').value = '';
+    return pinError({ wrong: 'The current PIN didn’t match.', locked_out: 'Too many tries. The PIN is locked for 15 minutes.' }[result] || 'The PIN needs to be 4 to 8 digits.');
+  }
   toast('Photo PIN saved');
   openLibrary();
 };

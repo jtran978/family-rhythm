@@ -1,5 +1,76 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="116" fill="#56735c"/>
-  <path d="M256 397C164 340 102 284 102 205c0-56 41-96 94-96 30 0 51 13 60 33 10-20 31-33 61-33 53 0 94 40 94 96 0 79-62 135-155 192Z" fill="#f6f1e7"/>
-  <path d="M256 342c-61-40-105-80-105-133 0-29 20-50 48-50 26 0 42 16 57 43 15-27 32-43 58-43 28 0 48 21 48 50 0 53-45 93-106 133Z" fill="#dca9a6"/>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="75%">
+      <stop offset="0" stop-color="#a9c2a6"/><stop offset="1" stop-color="#5f7d65"/>
+    </radialGradient>
+    <radialGradient id="fur" gradientUnits="userSpaceOnUse" cx="256" cy="230" r="240">
+      <stop offset="0" stop-color="#3a3740"/><stop offset=".75" stop-color="#1d1c21"/><stop offset="1" stop-color="#141317"/>
+    </radialGradient>
+    <radialGradient id="furIn" gradientUnits="userSpaceOnUse" cx="256" cy="240" r="200">
+      <stop offset="0" stop-color="#2f2c35"/><stop offset="1" stop-color="#211f25"/>
+    </radialGradient>
+    <radialGradient id="face" cx="50%" cy="40%" r="65%">
+      <stop offset="0" stop-color="#38353e"/><stop offset="1" stop-color="#232127"/>
+    </radialGradient>
+    <linearGradient id="tongue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6f6db8"/><stop offset="1" stop-color="#4d4a93"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+
+  <!-- ears, peeking out of the mane -->
+  <path d="M126 186 Q130 120 158 76 Q168 64 178 76 Q214 118 226 162 Z" fill="#1c1b20"/>
+  <path d="M386 186 Q382 120 354 76 Q344 64 334 76 Q298 118 286 162 Z" fill="#1c1b20"/>
+  <path d="M148 170 Q152 128 166 102 Q172 96 178 104 Q198 132 204 160 Z" fill="#4a4250"/>
+  <path d="M364 170 Q360 128 346 102 Q340 96 334 104 Q314 132 308 160 Z" fill="#4a4250"/>
+
+  <!-- big fluffy mane -->
+  <ellipse cx="256" cy="292" rx="160" ry="146" fill="url(#fur)"/><circle cx="246.4" cy="146.3" r="36.3" fill="url(#fur)"/><circle cx="290.8" cy="149.5" r="30.6" fill="url(#fur)"/><circle cx="336.4" cy="165.8" r="35.7" fill="url(#fur)"/><circle cx="362.4" cy="182.9" r="36.5" fill="url(#fur)"/><circle cx="387.4" cy="208.7" r="33.9" fill="url(#fur)"/><circle cx="403.6" cy="235.6" r="40.0" fill="url(#fur)"/><circle cx="413.9" cy="268.2" r="35.3" fill="url(#fur)"/><circle cx="414.6" cy="311.1" r="41.6" fill="url(#fur)"/><circle cx="406.4" cy="341.8" r="31.2" fill="url(#fur)"/><circle cx="390.7" cy="370.8" r="40.3" fill="url(#fur)"/><circle cx="360.8" cy="402.3" r="37.8" fill="url(#fur)"/><circle cx="330.7" cy="421.1" r="33.3" fill="url(#fur)"/><circle cx="297.9" cy="432.9" r="41.1" fill="url(#fur)"/><circle cx="265.4" cy="437.7" r="32.7" fill="url(#fur)"/><circle cx="216.3" cy="433.4" r="40.0" fill="url(#fur)"/><circle cx="190.0" cy="425.0" r="35.4" fill="url(#fur)"/><circle cx="144.5" cy="396.7" r="37.3" fill="url(#fur)"/><circle cx="128.9" cy="380.7" r="38.5" fill="url(#fur)"/><circle cx="103.5" cy="336.2" r="34.5" fill="url(#fur)"/><circle cx="96.4" cy="302.6" r="30.3" fill="url(#fur)"/><circle cx="97.7" cy="270.6" r="41.3" fill="url(#fur)"/><circle cx="109.7" cy="232.9" r="34.0" fill="url(#fur)"/><circle cx="120.8" cy="213.9" r="41.2" fill="url(#fur)"/><circle cx="156.5" cy="177.7" r="40.2" fill="url(#fur)"/><circle cx="190.3" cy="158.9" r="41.2" fill="url(#fur)"/><circle cx="216.4" cy="150.5" r="33.6" fill="url(#fur)"/>
+  <ellipse cx="256" cy="288" rx="138" ry="128" fill="url(#furIn)"/><circle cx="257.9" cy="160.0" r="20.2" fill="url(#furIn)"/><circle cx="302.0" cy="167.3" r="28.3" fill="url(#furIn)"/><circle cx="328.5" cy="179.1" r="28.7" fill="url(#furIn)"/><circle cx="354.7" cy="198.5" r="26.7" fill="url(#furIn)"/><circle cx="384.4" cy="241.2" r="25.5" fill="url(#furIn)"/><circle cx="393.0" cy="272.5" r="25.1" fill="url(#furIn)"/><circle cx="391.6" cy="311.6" r="24.3" fill="url(#furIn)"/><circle cx="378.4" cy="347.1" r="30.0" fill="url(#furIn)"/><circle cx="361.1" cy="371.0" r="28.1" fill="url(#furIn)"/><circle cx="330.5" cy="395.7" r="22.3" fill="url(#furIn)"/><circle cx="302.0" cy="408.7" r="20.5" fill="url(#furIn)"/><circle cx="250.6" cy="415.9" r="21.1" fill="url(#furIn)"/><circle cx="219.5" cy="411.4" r="25.5" fill="url(#furIn)"/><circle cx="183.1" cy="396.7" r="24.7" fill="url(#furIn)"/><circle cx="156.1" cy="376.3" r="23.8" fill="url(#furIn)"/><circle cx="132.8" cy="345.7" r="25.7" fill="url(#furIn)"/><circle cx="119.3" cy="305.4" r="29.2" fill="url(#furIn)"/><circle cx="118.6" cy="275.9" r="29.8" fill="url(#furIn)"/><circle cx="134.1" cy="228.0" r="27.7" fill="url(#furIn)"/><circle cx="152.4" cy="203.4" r="23.7" fill="url(#furIn)"/><circle cx="186.5" cy="177.4" r="26.5" fill="url(#furIn)"/><circle cx="217.2" cy="165.2" r="23.1" fill="url(#furIn)"/>
+
+  <!-- face -->
+  <ellipse cx="256" cy="270" rx="128" ry="118" fill="url(#face)"/>
+  <!-- little fur flicks -->
+  <g fill="none" stroke="#45414c" stroke-width="6" stroke-linecap="round" opacity=".8">
+    <path d="M226 168 q8 -12 18 -2"/><path d="M262 162 q8 -12 18 -2"/>
+    <path d="M146 262 q-16 8 -16 26"/><path d="M366 262 q16 8 16 26"/>
+    <path d="M160 330 q-10 14 -2 28"/><path d="M352 330 q10 14 2 28"/>
+  </g>
+
+  <!-- blush -->
+  <ellipse cx="174" cy="304" rx="22" ry="12" fill="#ff9fb4" opacity=".32"/>
+  <ellipse cx="338" cy="304" rx="22" ry="12" fill="#ff9fb4" opacity=".32"/>
+
+  <!-- eyes: happy, deep-set chow eyes with a warm brown rim -->
+  <g>
+    <ellipse cx="204" cy="246" rx="21" ry="19" fill="#0f0d10"/>
+    <ellipse cx="204" cy="247" rx="16" ry="15" fill="#94572a"/>
+    <ellipse cx="204" cy="249" rx="9" ry="9" fill="#120e0c"/>
+    <circle cx="198" cy="242" r="5.5" fill="#fff"/><circle cx="210" cy="252" r="2.4" fill="#fff" opacity=".8"/>
+    <ellipse cx="308" cy="246" rx="21" ry="19" fill="#0f0d10"/>
+    <ellipse cx="308" cy="247" rx="16" ry="15" fill="#94572a"/>
+    <ellipse cx="308" cy="249" rx="9" ry="9" fill="#120e0c"/>
+    <circle cx="302" cy="242" r="5.5" fill="#fff"/><circle cx="314" cy="252" r="2.4" fill="#fff" opacity=".8"/>
+    <!-- soft brows -->
+    <path d="M182 220 q22 -14 44 0" fill="none" stroke="#4a4652" stroke-width="7" stroke-linecap="round"/>
+    <path d="M286 220 q22 -14 44 0" fill="none" stroke="#4a4652" stroke-width="7" stroke-linecap="round"/>
+  </g>
+
+  <!-- muzzle -->
+  <ellipse cx="256" cy="318" rx="78" ry="56" fill="#3a3640"/>
+  <ellipse cx="256" cy="306" rx="56" ry="30" fill="#423e48" opacity=".7"/>
+
+  <!-- open smile: dark mouth, blue-black chow tongue, two little bottom teeth -->
+  <path d="M212 322 Q256 334 300 322 Q296 368 256 374 Q216 368 212 322 Z" fill="#120f14"/>
+  <path d="M228 346 Q256 336 284 346 Q282 376 256 380 Q230 376 228 346 Z" fill="url(#tongue)"/>
+  <path d="M256 344 L256 368" stroke="#3f3c80" stroke-width="3.5" stroke-linecap="round"/>
+  <ellipse cx="245" cy="356" rx="5" ry="8" fill="#a9a8ea" opacity=".45"/>
+  <path d="M221 352 Q224 341 228 337 Q231 343 233 354 Z" fill="#fbf7ef"/>
+  <path d="M291 352 Q288 341 284 337 Q281 343 279 354 Z" fill="#fbf7ef"/>
+  <path d="M256 308 L256 324" stroke="#0c0b0e" stroke-width="6" stroke-linecap="round"/>
+  <path d="M208 320 Q256 338 304 320" fill="none" stroke="#0c0b0e" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- nose -->
+  <path d="M226 290 Q226 270 256 270 Q286 270 286 290 Q286 308 256 312 Q226 308 226 290 Z" fill="#0b0a0c"/>
+  <ellipse cx="246" cy="280" rx="10" ry="5" fill="#fff" opacity=".45"/>
 </svg>
