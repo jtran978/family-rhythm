@@ -150,3 +150,8 @@ dialog.sheet{max-width:640px;width:calc(100% - 20px);max-height:calc(100dvh - 30
 .check-row input{width:20px;height:20px;accent-color:var(--sage)}
 .check-row small{font-weight:500}
 .back-link{padding:0;margin:-6px 0 14px;font-size:15px}
+
+/* ---- chores-first Today for people who don't do weigh-ins ---- */
+body.no-weigh .weigh-only,body.no-weigh .bottom-nav [data-view="weighins"]{display:none}
+body.no-weigh .bottom-nav{grid-template-columns:repeat(5,1fr)}
+body.no-weigh .summary-grid .summary-card.plain{grid-column:1/-1;min-height:auto}

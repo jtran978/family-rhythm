@@ -282,6 +282,41 @@ $$('.bottom-nav button').forEach(b => b.onclick = () => go(b.dataset.view));
 $$('[data-go]').forEach(b => b.onclick = () => go(b.dataset.go));
 
 // ---------- rendering ----------
+// People who don't do weigh-ins (unchecked in their profile) get a chores-first Today screen.
+const doesWeighIns = () => me?.weigh_reminders !== false;
+let heroAction = null;
+
+function renderHero(logged) {
+  const weigh = doesWeighIns();
+  document.body.classList.toggle('no-weigh', !weigh);
+  if (weigh) {
+    $('#heroEyebrow').textContent = 'A gentle check-in';
+    let status = 'Next weigh-in is ' + nextWeighIn();
+    if (scheduledToday() && !logged) status = 'Today is a weigh-in day. A family photo is waiting.';
+    if (logged) status = 'Today’s check-in is complete. Nicely done.';
+    $('#weighStatus').textContent = status;
+    $('#openWeighIn').textContent = 'Log weigh-in';
+    heroAction = openWeigh;
+    return;
+  }
+  const chore = data.chores.find(x => !x.done);
+  const errand = data.errands.find(x => !x.done && !x.archived);
+  $('#heroEyebrow').textContent = 'Ready to help?';
+  if (chore) {
+    $('#weighStatus').textContent = `You can do a chore! “${chore.name}” is up for grabs.`;
+    $('#openWeighIn').textContent = 'See chores';
+    heroAction = () => go('chores');
+  } else if (errand) {
+    $('#weighStatus').textContent = `You can knock out an errand! “${errand.name}” is waiting, and it counts toward a sweet treat.`;
+    $('#openWeighIn').textContent = 'See errands';
+    heroAction = () => go('errands');
+  } else {
+    $('#weighStatus').textContent = 'Every chore and errand is done. Enjoy your day!';
+    $('#openWeighIn').textContent = 'See chores';
+    heroAction = () => go('chores');
+  }
+}
+
 function render() {
   const today = dateKey();
   const done = data.chores.filter(x => x.done).length;
@@ -292,10 +327,7 @@ function render() {
   const wins = done + errandsToday + (logged ? 1 : 0);
   $('#todayProgress').textContent = `${wins} small win${wins === 1 ? '' : 's'}`;
 
-  let status = 'Next weigh-in is ' + nextWeighIn();
-  if (scheduledToday() && !logged) status = 'Today is a weigh-in day. A family photo is waiting.';
-  if (logged) status = 'Today’s check-in is complete. Nicely done.';
-  $('#weighStatus').textContent = status;
+  renderHero(logged);
 
   renderWeights(); renderChores(); renderErrands(); renderBills(); renderRecipes();
 }
@@ -773,7 +805,7 @@ $('#choreForm').onsubmit = async e => {
 };
 
 const openWeigh = () => { $('#weightValue').value = ''; $('#weighDialog').showModal(); setTimeout(() => $('#weightValue').focus(), 100); };
-$('#openWeighIn').onclick = openWeigh;
+$('#openWeighIn').onclick = () => (heroAction || openWeigh)();
 $('#openWeighInLarge').onclick = openWeigh;
 $('#weighForm').onsubmit = async e => {
   e.preventDefault();

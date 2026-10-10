@@ -60,7 +60,7 @@
           <span class="field-label" id="faceLabel">Or pick a face</span>
           <div id="emojiRow" class="emoji-row"></div>
         </div>
-        <label class="check-row"><input type="checkbox" id="profileWeighReminders" checked /> Weigh-in reminders <small class="muted">Monday and Friday</small></label>
+        <label class="check-row"><input type="checkbox" id="profileWeighReminders" checked /> Does weigh-ins <small class="muted">Monday and Friday reminders, and weigh-ins on the Today screen. Unchecked: Today starts with chores.</small></label>
         <div class="inline-form">
           <button type="button" id="cancelProfile" class="ghost">Cancel</button>
           <button type="submit" class="primary grow" id="saveProfile">Add</button>
@@ -85,7 +85,7 @@
     <section id="home" class="view active" aria-labelledby="home-title">
       <div class="hero-card">
         <div>
-          <p class="eyebrow">A gentle check-in</p>
+          <p class="eyebrow" id="heroEyebrow">A gentle check-in</p>
           <h2 id="home-title">Hi, <span id="helloName">there</span>.</h2>
           <p id="weighStatus" class="muted"></p>
         </div>
@@ -97,7 +97,7 @@
         <span id="todayProgress" class="pill"></span>
       </div>
       <div class="summary-grid">
-        <button class="summary-card rose" data-go="weighins">
+        <button class="summary-card rose weigh-only" data-go="weighins">
           <span class="summary-icon">◒</span>
           <strong id="weighSummary">Not yet</strong>
           <small>Weigh-in</small>
@@ -120,8 +120,8 @@
       </div>
       <button class="list-card photo-link" data-go="photos"><span class="summary-icon">🔒</span><div class="grow"><strong>Photo library</strong><small>Locked with the photo PIN</small></div><span aria-hidden="true">›</span></button>
 
-      <div class="section-heading"><h2>Recent weigh-ins</h2><button class="text-button" data-go="weighins">See all</button></div>
-      <div id="recentWeights" class="stack"></div>
+      <div class="section-heading weigh-only"><h2>Recent weigh-ins</h2><button class="text-button" data-go="weighins">See all</button></div>
+      <div id="recentWeights" class="stack weigh-only"></div>
 
       <div class="section-heading"><h2>Reminders</h2></div>
       <div class="list-card reminder-card">
