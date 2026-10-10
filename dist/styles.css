@@ -149,3 +149,4 @@ dialog.sheet{max-width:640px;width:calc(100% - 20px);max-height:calc(100dvh - 30
 .entry-form .check-row,.check-row{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:700;cursor:pointer;flex-wrap:wrap}
 .check-row input{width:20px;height:20px;accent-color:var(--sage)}
 .check-row small{font-weight:500}
+.back-link{padding:0;margin:-6px 0 14px;font-size:15px}

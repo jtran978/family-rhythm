@@ -121,6 +121,10 @@ function renderPicker() {
   $('#pickerTitle').textContent = editingPeople ? 'Tap someone to edit' : 'Who’s checking in?';
   $('#editPeople').textContent = editingPeople ? 'Done editing' : 'Edit people';
   $('#editPeople').hidden = !profiles.length;
+  // Back to the app as the same person (only when someone is already checked in on this phone).
+  const current = me && profiles.find(p => p.id === me.id);
+  $('#pickerBack').hidden = !current;
+  if (current) $('#pickerBack').textContent = `‹ Back to ${current.name}`;
   $('#profileList').innerHTML = profiles.map(p =>
     `<button class="profile-btn" data-profile="${p.id}"><span class="face">${faceHTML(p)}</span>${esc(p.name)}</button>`
   ).join('') + `<button class="profile-btn add" id="addProfile"><span class="face">＋</span>Add person</button>`;
@@ -130,6 +134,12 @@ function renderPicker() {
   });
   $('#addProfile').onclick = () => openProfileForm();
 }
+$('#pickerBack').onclick = () => {
+  editingPeople = false;
+  $('#profileForm').hidden = true;
+  const current = me && profiles.find(p => p.id === me.id);
+  if (current) enterApp(current);
+};
 $('#editPeople').onclick = () => { editingPeople = !editingPeople; $('#profileForm').hidden = true; renderPicker(); };
 
 // Center-crop to a square and shrink, so profile photos are small and load fast.
