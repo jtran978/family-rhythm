@@ -155,3 +155,6 @@ dialog.sheet{max-width:640px;width:calc(100% - 20px);max-height:calc(100dvh - 30
 body.no-weigh .weigh-only,body.no-weigh .bottom-nav [data-view="weighins"]{display:none}
 body.no-weigh .bottom-nav{grid-template-columns:repeat(5,1fr)}
 body.no-weigh .summary-grid .summary-card.plain{grid-column:1/-1;min-height:auto}
+.hero-actions{display:grid;gap:8px}
+.hero-secondary{border:1.5px solid rgba(255,255,255,.7);background:transparent;color:#fff;border-radius:14px;padding:12px 18px;font:inherit;font-weight:800;cursor:pointer;white-space:nowrap}
+@media(max-width:560px){.hero-actions{width:100%}}

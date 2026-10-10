@@ -289,6 +289,7 @@ let heroAction = null;
 function renderHero(logged) {
   const weigh = doesWeighIns();
   document.body.classList.toggle('no-weigh', !weigh);
+  $('#heroSecond').hidden = true;
   if (weigh) {
     $('#heroEyebrow').textContent = 'A gentle check-in';
     let status = 'Next weigh-in is ' + nextWeighIn();
@@ -302,7 +303,12 @@ function renderHero(logged) {
   const chore = data.chores.find(x => !x.done);
   const errand = data.errands.find(x => !x.done && !x.archived);
   $('#heroEyebrow').textContent = 'Ready to help?';
-  if (chore) {
+  if (chore && errand) {
+    $('#weighStatus').textContent = `You can do a chore or an errand! Try “${chore.name}”, or knock out “${errand.name}” for a sweet treat.`;
+    $('#openWeighIn').textContent = 'See chores';
+    $('#heroSecond').hidden = false;
+    heroAction = () => go('chores');
+  } else if (chore) {
     $('#weighStatus').textContent = `You can do a chore! “${chore.name}” is up for grabs.`;
     $('#openWeighIn').textContent = 'See chores';
     heroAction = () => go('chores');
@@ -806,6 +812,7 @@ $('#choreForm').onsubmit = async e => {
 
 const openWeigh = () => { $('#weightValue').value = ''; $('#weighDialog').showModal(); setTimeout(() => $('#weightValue').focus(), 100); };
 $('#openWeighIn').onclick = () => (heroAction || openWeigh)();
+$('#heroSecond').onclick = () => go('errands');
 $('#openWeighInLarge').onclick = openWeigh;
 $('#weighForm').onsubmit = async e => {
   e.preventDefault();
