@@ -24,16 +24,6 @@ create table public.weigh_ins (
   unique (profile_id, date)
 );
 
-create table public.foods (
-  id uuid primary key default gen_random_uuid(),
-  owner uuid not null default auth.uid() references auth.users on delete cascade,
-  profile_id uuid not null references public.profiles on delete cascade,
-  date date not null,
-  name text not null check (char_length(name) between 1 and 80),
-  note text check (char_length(note) <= 180),
-  created_at timestamptz not null default now()
-);
-
 create table public.chores (
   id uuid primary key default gen_random_uuid(),
   owner uuid not null default auth.uid() references auth.users on delete cascade,
@@ -41,6 +31,8 @@ create table public.chores (
   done boolean not null default false,
   done_by uuid references public.profiles on delete set null,
   done_at timestamptz,
+  remind_hour smallint default 18 check (remind_hour between 0 and 23), -- New York time; null = no reminder
+  last_reminded_on date,
   created_at timestamptz not null default now()
 );
 
@@ -55,14 +47,17 @@ create table public.push_subscriptions (
 );
 
 create index on public.weigh_ins (profile_id, date desc);
-create index on public.foods (profile_id, created_at desc);
 create index on public.chores (owner, created_at);
+
+grant select, insert, update, delete
+  on public.profiles, public.weigh_ins, public.chores, public.push_subscriptions
+  to authenticated, service_role;
 
 -- Row Level Security: each login sees only its own household's rows.
 do $$
 declare t text;
 begin
-  foreach t in array array['profiles','weigh_ins','foods','chores','push_subscriptions'] loop
+  foreach t in array array['profiles','weigh_ins','chores','push_subscriptions'] loop
     execute format('alter table public.%I enable row level security', t);
     execute format(
       'create policy "household only" on public.%I for all to authenticated

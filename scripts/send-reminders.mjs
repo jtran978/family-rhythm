@@ -9,7 +9,8 @@ const TZ = 'America/New_York';
 const WEIGH_DAYS = ['Mon', 'Fri'];
 const WEIGH_IN_HOUR = 8;         // morning reminder on weigh-in days
 const WEIGH_IN_NUDGE_HOUR = 19;  // evening nudge if still not logged
-const CHORE_HOUR = 18;           // daily nudge if any chores are open
+const CHORE_CATCH_UP_HOURS = 2;  // GitHub sometimes runs late or skips an hour
+// Each chore's reminder hour is set in the app (chores.remind_hour).
 
 const {
   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
@@ -54,7 +55,6 @@ async function send(sub, payload) {
 }
 
 const doWeigh = REMINDER_FORCE === 'weigh' || (weighDay && (hour === WEIGH_IN_HOUR || hour === WEIGH_IN_NUDGE_HOUR));
-const doChores = REMINDER_FORCE === 'chores' || hour === CHORE_HOUR;
 
 if (doWeigh && subs.length) {
   const { data: logged } = await db.from('weigh_ins').select('profile_id').eq('date', today);
@@ -68,14 +68,27 @@ if (doWeigh && subs.length) {
   }
 }
 
-if (doChores && subs.length) {
-  const { data: open } = await db.from('chores').select('owner').eq('done', false);
-  const counts = {};
-  for (const c of open || []) counts[c.owner] = (counts[c.owner] || 0) + 1;
+// Open chores whose reminder hour has arrived (within the catch-up window) and
+// haven't been reminded today. A forced test sends every open chore that has a reminder.
+if (subs.length) {
+  const force = REMINDER_FORCE === 'chores';
+  let q = db.from('chores').select('id, owner, name').eq('done', false).not('remind_hour', 'is', null);
+  if (!force) q = q
+    .lte('remind_hour', hour).gte('remind_hour', hour - CHORE_CATCH_UP_HOURS)
+    .or(`last_reminded_on.is.null,last_reminded_on.lt.${today}`);
+  const { data: due, error: choreError } = await q;
+  if (choreError) console.error(choreError);
+
+  const byOwner = {};
+  for (const c of due || []) (byOwner[c.owner] ||= []).push(c.name);
   for (const sub of subs) {
-    const n = counts[sub.owner];
-    if (!n) continue;
-    await send(sub, { title: 'A little household love', body: `${n} chore${n === 1 ? ' is' : 's are'} ready when you are.`, tag: 'chores' });
+    const names = byOwner[sub.owner];
+    if (!names) continue;
+    const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+    await send(sub, { title: 'A little household love', body: `${list} ${names.length === 1 ? 'is' : 'are'} ready when you are.`, tag: `chores-${hour}` });
+  }
+  if (!force && due?.length) {
+    await db.from('chores').update({ last_reminded_on: today }).in('id', due.map(c => c.id));
   }
 }
 

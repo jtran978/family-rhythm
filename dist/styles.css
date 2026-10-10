@@ -35,3 +35,18 @@ button.avatar{border:0;cursor:pointer;font-size:24px}
 .toast.show{transform:translate(-50%,calc(18px + env(safe-area-inset-top)));opacity:1}
 .app-shell{padding-top:calc(24px + env(safe-area-inset-top))}
 .bottom-nav{bottom:calc(14px + env(safe-area-inset-bottom))}
+
+/* ---- four-tab nav, chore reminder times ---- */
+.bottom-nav{grid-template-columns:repeat(4,1fr)}
+.time-select{width:100%;border:1px solid var(--line);border-radius:12px;background:white;padding:13px;font:inherit;color:var(--ink)}
+.time-select.compact{width:auto;flex:none;padding:7px 8px;border-radius:10px;font-size:13px;color:var(--sage);font-weight:700}
+.list-card .completed + .time-select{opacity:.5}
+
+/* ---- photo PIN ---- */
+.pin-form{text-align:center;justify-items:center}
+.pin-form .gate-mark{margin:0 auto}
+.pin-form strong{font-size:18px}
+.pin-form input{max-width:240px;text-align:center;font-size:22px;letter-spacing:.3em}
+.pin-form .primary{width:100%;max-width:240px}
+.library-actions{margin-top:18px}
+.pin-form input::placeholder{letter-spacing:normal;font-size:16px}

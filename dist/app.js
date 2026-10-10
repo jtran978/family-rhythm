@@ -1,5 +1,5 @@
 // Family Rhythm: one household login, a profile per person.
-// Weigh-ins and food are per profile. Chores and photos are shared.
+// Weigh-ins are per profile. Chores and photos are shared.
 
 const cfg = window.FAMILY_RHYTHM_CONFIG || {};
 const configured = /^https:\/\//.test(cfg.supabaseUrl || '') && !/PASTE_/.test(cfg.supabaseAnonKey || 'PASTE_');
@@ -15,11 +15,12 @@ const store = {
 
 const FACES = ['😊', '🌷', '🌿', '☀️', '🐻', '🦊', '🐢', '⭐'];
 const WEIGH_DAYS = [1, 5]; // Monday, Friday
+const DEFAULT_CHORE_HOUR = 18;
 
 let session = null;
 let profiles = [];
 let me = null;
-const data = { weights: [], foods: [], chores: [], photos: [] };
+const data = { weights: [], chores: [], photos: [] };
 
 // ---------- helpers ----------
 const dateKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -29,6 +30,11 @@ let toastTimer;
 function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 2000); }
 function oops(error, fallback = 'Something went sideways. Try again?') { if (error) { console.error(error); toast(fallback); return true; } return false; }
 const profileName = id => profiles.find(p => p.id === id)?.name;
+// Reminder hours are New York time, matching scripts/send-reminders.mjs.
+const hourLabel = h => `${h % 12 || 12} ${h < 12 ? 'AM' : 'PM'}`;
+const hourOptions = selected => ['<option value="">No reminder</option>']
+  .concat(Array.from({ length: 24 }, (_, h) => `<option value="${h}"${h === selected ? ' selected' : ''}>${hourLabel(h)}</option>`))
+  .join('');
 
 // ---------- screens ----------
 function showGate(name) {
@@ -117,7 +123,7 @@ $('#switchProfile').onclick = () => { renderPicker(); $('#profileForm').hidden =
 
 async function enterApp(profile) {
   me = profile;
-  data.weights = []; data.foods = [];
+  data.weights = [];
   render();
   store.set('fr-profile', me.id);
   $('#avatarFace').textContent = me.emoji;
@@ -126,25 +132,26 @@ async function enterApp(profile) {
   showGate(null);
   go('home');
   await refresh();
-  loadPhotos();
   syncReminderProfile();
 }
 
 // ---------- data ----------
 async function refresh() {
   if (!me) return;
-  const [w, f, c] = await Promise.all([
+  const [w, c] = await Promise.all([
     sb.from('weigh_ins').select('*').eq('profile_id', me.id).order('date', { ascending: false }).limit(400),
-    sb.from('foods').select('*').eq('profile_id', me.id).order('created_at', { ascending: false }).limit(300),
     sb.from('chores').select('*').order('created_at')
   ]);
-  if (oops(w.error || f.error || c.error, 'Couldn’t reach the cloud. Check your connection.')) return;
-  data.weights = w.data; data.foods = f.data; data.chores = c.data;
+  if (oops(w.error || c.error, 'Couldn’t reach the cloud. Check your connection.')) return;
+  data.weights = w.data; data.chores = c.data;
   render();
 }
 
 // ---------- navigation ----------
 function go(id) {
+  const leaving = $('.view.active')?.id;
+  if (leaving === 'photos' && id !== 'photos') lockPhotos();
+  if (id === 'photos' && leaving !== 'photos') openPhotos();
   $$('.view').forEach(v => v.classList.toggle('active', v.id === id));
   $$('.bottom-nav button').forEach(b => b.classList.toggle('active', b.dataset.view === id));
   scrollTo({ top: 0, behavior: 'smooth' });
@@ -155,19 +162,19 @@ $$('[data-go]').forEach(b => b.onclick = () => go(b.dataset.go));
 // ---------- rendering ----------
 function render() {
   const today = dateKey();
-  const foodsToday = data.foods.filter(x => x.date === today);
   const done = data.chores.filter(x => x.done).length;
-  $('#mealCount').textContent = `${foodsToday.length} ${foodsToday.length === 1 ? 'entry' : 'entries'}`;
-  $('#choreSummary').textContent = `${done} of ${data.chores.length}`;
-  $('#todayProgress').textContent = `${foodsToday.length + done} small wins`;
-
   const logged = data.weights.some(x => x.date === today);
+  $('#choreSummary').textContent = `${done} of ${data.chores.length}`;
+  $('#weighSummary').textContent = logged ? 'Done today ✓' : scheduledToday() ? 'Due today' : `Next: ${nextWeighIn().split(',')[0]}`;
+  const wins = done + (logged ? 1 : 0);
+  $('#todayProgress').textContent = `${wins} small win${wins === 1 ? '' : 's'}`;
+
   let status = 'Next weigh-in is ' + nextWeighIn();
   if (scheduledToday() && !logged) status = 'Today is a weigh-in day. A family photo is waiting.';
   if (logged) status = 'Today’s check-in is complete. Nicely done.';
   $('#weighStatus').textContent = status;
 
-  renderWeights(); renderFoods(); renderChores();
+  renderWeights(); renderChores();
 }
 const scheduledToday = () => WEIGH_DAYS.includes(new Date().getDay());
 function nextWeighIn() {
@@ -190,21 +197,19 @@ function renderWeights() {
   });
 }
 
-function renderFoods() {
-  $('#foodList').innerHTML = data.foods.map(x =>
-    `<div class="list-card"><div class="grow"><strong>${esc(x.name)}</strong><small>${x.note ? esc(x.note) + ' · ' : ''}${prettyDate(x.date)}</small></div><button class="delete" data-delete-food="${x.id}" aria-label="Delete entry">×</button></div>`
-  ).join('') || '<div class="empty">Nothing logged yet. Keep it simple and just add what you ate.</div>';
-  $$('[data-delete-food]').forEach(b => b.onclick = async () => {
-    const { error } = await sb.from('foods').delete().eq('id', b.dataset.deleteFood);
-    if (!oops(error)) refresh();
-  });
-}
-
 function renderChores() {
   $('#choreList').innerHTML = data.chores.map(x => {
     const who = x.done && profileName(x.done_by);
-    return `<div class="list-card"><button class="check ${x.done ? 'done' : ''}" data-toggle-chore="${x.id}" aria-label="Mark complete">${x.done ? '✓' : ''}</button><div class="grow ${x.done ? 'completed' : ''}"><strong>${esc(x.name)}</strong><small>${x.done ? (who ? `Done by ${esc(who)}` : 'Complete') : 'Ready when you are'}</small></div><button class="delete" data-delete-chore="${x.id}" aria-label="Delete chore">×</button></div>`;
+    return `<div class="list-card"><button class="check ${x.done ? 'done' : ''}" data-toggle-chore="${x.id}" aria-label="Mark complete">${x.done ? '✓' : ''}</button><div class="grow ${x.done ? 'completed' : ''}"><strong>${esc(x.name)}</strong><small>${x.done ? (who ? `Done by ${esc(who)}` : 'Complete') : 'Ready when you are'}</small></div><select class="time-select compact" data-chore-time="${x.id}" aria-label="Reminder time for ${esc(x.name)}">${hourOptions(x.remind_hour)}</select><button class="delete" data-delete-chore="${x.id}" aria-label="Delete chore">×</button></div>`;
   }).join('') || '<div class="empty">Your chore list is clear.</div>';
+  $$('[data-chore-time]').forEach(s => s.onchange = async () => {
+    const remind_hour = s.value === '' ? null : Number(s.value);
+    // Clearing last_reminded_on lets a new time still remind later today.
+    const { error } = await sb.from('chores').update({ remind_hour, last_reminded_on: null }).eq('id', s.dataset.choreTime);
+    if (oops(error, 'Couldn’t change that reminder')) return refresh();
+    toast(remind_hour === null ? 'Reminder off' : `Reminder set for ${hourLabel(remind_hour)}`);
+    refresh();
+  });
   $$('[data-toggle-chore]').forEach(b => b.onclick = async () => {
     const chore = data.chores.find(x => x.id === b.dataset.toggleChore);
     const done = !chore.done;
@@ -218,18 +223,13 @@ function renderChores() {
 }
 
 // ---------- forms ----------
-$('#foodForm').onsubmit = async e => {
-  e.preventDefault();
-  const { error } = await sb.from('foods').insert({ profile_id: me.id, date: dateKey(), name: $('#foodName').value.trim(), note: $('#foodNote').value.trim() || null });
-  if (oops(error, 'Couldn’t save that entry')) return;
-  e.target.reset(); toast('Food entry added'); refresh();
-};
-
+$('#choreRemind').innerHTML = hourOptions(DEFAULT_CHORE_HOUR);
 $('#choreForm').onsubmit = async e => {
   e.preventDefault();
-  const { error } = await sb.from('chores').insert({ name: $('#choreName').value.trim() });
+  const r = $('#choreRemind').value;
+  const { error } = await sb.from('chores').insert({ name: $('#choreName').value.trim(), remind_hour: r === '' ? null : Number(r) });
   if (oops(error, 'Couldn’t add that chore')) return;
-  e.target.reset(); toast('Chore added'); refresh();
+  $('#choreName').value = ''; toast('Chore added'); refresh();
 };
 
 const openWeigh = () => { $('#weightValue').value = ''; $('#weighDialog').showModal(); setTimeout(() => $('#weightValue').focus(), 100); };
@@ -249,15 +249,89 @@ $('#weighForm').onsubmit = async e => {
   refresh();
 };
 
-function showReward() {
+// A fresh weigh-in earns one random photo for a couple of minutes, no PIN needed.
+async function showReward() {
   const img = $('#rewardImage'), empty = $('#rewardEmpty');
-  if (data.photos.length) {
-    img.src = data.photos[Math.floor(Math.random() * data.photos.length)].url;
-    img.hidden = false; empty.hidden = true;
-  } else { img.hidden = true; empty.hidden = false; }
+  img.hidden = true; empty.hidden = true;
   $('#reward').hidden = false;
+  const { data: path } = await sb.rpc('grant_reward');
+  const signed = path ? (await sb.storage.from('photos').createSignedUrl(path, 120)).data : null;
+  if (signed?.signedUrl) { img.src = signed.signedUrl; img.hidden = false; } else empty.hidden = false;
 }
 $('#closeReward').onclick = () => { $('#reward').hidden = true; };
+
+// ---------- photo PIN ----------
+// The PIN is checked in the database, and storage only serves the library while it's
+// unlocked (see supabase/migrations/003_photo_pin.sql), so this isn't just a screen cover.
+let pinMode = 'unlock'; // 'unlock' | 'create' | 'change'
+let photosOpen = false;
+let pickingPhotos = false; // the iOS photo picker can briefly hide the app; don't lock mid-upload
+
+function clearLibrary() {
+  photosOpen = false;
+  data.photos = [];
+  $('#photoGrid').innerHTML = '';
+  $('#photoLibrary').hidden = true;
+}
+
+function showPinForm(mode) {
+  pinMode = mode;
+  clearLibrary();
+  $('#pinForm').reset();
+  $('#pinForm').hidden = false;
+  $('#pinTitle').textContent = { unlock: 'Enter the photo PIN', create: 'Create a photo PIN', change: 'Choose a new photo PIN' }[mode];
+  $('#pinHint').textContent = mode === 'unlock'
+    ? 'Photos lock again when you leave this tab.'
+    : '4 to 8 digits. Anyone who wants to browse the photos will need it.';
+  $('#pinConfirm').hidden = mode === 'unlock';
+  $('#pinConfirm').required = mode !== 'unlock';
+  $('#pinSubmit').textContent = mode === 'unlock' ? 'Unlock' : 'Save PIN';
+  $('#pinCancel').hidden = mode !== 'change';
+  $('#pinError').hidden = true;
+}
+
+async function openPhotos() {
+  $('#pinForm').hidden = true; clearLibrary();
+  const { data: status, error } = await sb.rpc('photo_pin_status');
+  if (oops(error, 'Couldn’t check the photo lock')) return;
+  if (status === 'unlocked') return openLibrary();
+  showPinForm(status === 'none' ? 'create' : 'unlock');
+}
+
+function openLibrary() {
+  photosOpen = true;
+  $('#pinForm').hidden = true;
+  $('#photoLibrary').hidden = false;
+  loadPhotos();
+}
+
+async function lockPhotos() {
+  if (!photosOpen) return;
+  clearLibrary();
+  await sb.rpc('lock_photos');
+}
+
+const pinError = t => { $('#pinError').textContent = t; $('#pinError').hidden = false; };
+$('#pinForm').onsubmit = async e => {
+  e.preventDefault();
+  const pin = $('#pinInput').value;
+  if (pinMode === 'unlock') {
+    const { data: result, error } = await sb.rpc('unlock_photos', { pin });
+    if (oops(error, 'Couldn’t check the PIN')) return;
+    if (result === 'ok') return openLibrary();
+    if (result === 'no_pin') return showPinForm('create');
+    $('#pinInput').value = '';
+    return pinError(result === 'locked_out' ? 'Too many tries. Photos are locked for 15 minutes.' : 'That PIN didn’t match.');
+  }
+  if (pin !== $('#pinConfirm').value) return pinError('Those two PINs don’t match.');
+  const { error } = await sb.rpc('set_photo_pin', { new_pin: pin });
+  if (oops(error, 'Couldn’t save the PIN')) return;
+  toast('Photo PIN saved');
+  openLibrary();
+};
+$('#pinCancel').onclick = openLibrary;
+$('#changePin').onclick = () => showPinForm('change');
+$('#lockPhotos').onclick = async () => { await lockPhotos(); showPinForm('unlock'); };
 
 // ---------- photos (private bucket, shared by the household) ----------
 const photoFolder = () => session.user.id;
@@ -265,10 +339,11 @@ const photoFolder = () => session.user.id;
 async function loadPhotos() {
   const { data: files, error } = await sb.storage.from('photos').list(photoFolder(), { limit: 1000, sortBy: { column: 'created_at', order: 'desc' } });
   if (oops(error, 'Couldn’t load photos')) return;
+  if (!photosOpen) return;
   const paths = files.filter(f => f.id && !f.name.startsWith('.')).map(f => `${photoFolder()}/${f.name}`);
   if (!paths.length) { data.photos = []; return renderPhotos(); }
-  const { data: signed, error: e2 } = await sb.storage.from('photos').createSignedUrls(paths, 60 * 60 * 6);
-  if (oops(e2, 'Couldn’t load photos')) return;
+  const { data: signed, error: e2 } = await sb.storage.from('photos').createSignedUrls(paths, 60 * 15);
+  if (oops(e2, 'Couldn’t load photos') || !photosOpen) return;
   data.photos = signed.filter(s => s.signedUrl).map(s => ({ path: s.path, url: s.signedUrl }));
   renderPhotos();
 }
@@ -298,7 +373,9 @@ async function shrink(file, max = 1600) {
   } catch { return file; }
 }
 
+$('#photoInput').onclick = () => { pickingPhotos = true; };
 $('#photoInput').onchange = async e => {
+  pickingPhotos = false;
   const files = [...e.target.files];
   e.target.value = '';
   if (!files.length) return;
@@ -364,10 +441,10 @@ async function renderReminderCard() {
   const sub = await currentSubscription().catch(() => null);
   if (sub) {
     btn.textContent = 'Test';
-    status.textContent = `On for ${me.name} on this phone. Mondays and Fridays at 8am, plus 6pm if chores are open.`;
+    status.textContent = `On for ${me.name} on this phone. Mondays and Fridays at 8am, plus each open chore at its reminder time.`;
   } else {
     btn.textContent = 'Turn on';
-    status.textContent = 'Weigh-in mornings and an evening nudge for open chores.';
+    status.textContent = 'Weigh-in mornings, plus each chore at the time you choose.';
   }
 }
 
@@ -394,7 +471,13 @@ $('#enableReminders').onclick = async () => {
 };
 
 // Refresh when the app comes back to the foreground (another phone may have changed things).
+// Lock the photo library when the app goes to the background.
 document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && photosOpen && !pickingPhotos) {
+    lockPhotos();
+    showPinForm('unlock');
+  }
+  if (document.visibilityState === 'visible') pickingPhotos = false;
   if (document.visibilityState === 'visible' && me) {
     $('#todayLabel').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
     refresh();

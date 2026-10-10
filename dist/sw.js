@@ -1,4 +1,4 @@
-const CACHE = 'family-rhythm-v2';
+const CACHE = 'family-rhythm-v4';
 const SHELL = ['./', './index.html', './styles.css', './app.js', './config.js', './manifest.webmanifest', './icon.svg', './icon-180.png', './icon-512.png'];
 
 self.addEventListener('install', event => {
