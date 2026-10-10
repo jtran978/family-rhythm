@@ -120,3 +120,27 @@ dialog.sheet{max-width:640px;width:calc(100% - 20px);max-height:calc(100dvh - 30
 .photo-pick-btn{display:inline-block;cursor:pointer;padding:10px 14px;font-size:14px}
 .profile-list.editing .profile-btn:not(.add){outline:2px dashed var(--sage);outline-offset:-6px}
 .profile-list.editing .profile-btn.add{display:none}
+
+/* ---- annoying errands + sweet treats ---- */
+.summary-card.treat{background:#f7ecd5}
+.summary-card.plain{background:var(--card);border:1px solid var(--line)}
+.photo-link{margin-top:12px;width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer}
+.photo-link .summary-icon{font-size:20px}
+.treat-card{background:#f7ecd5;border-radius:22px;padding:20px;display:grid;gap:6px;justify-items:center;text-align:center;margin-bottom:16px}
+.treat-card strong{font-size:20px}
+.treat-card small{color:var(--muted)}
+.treat-card .primary{margin-top:8px}
+.punch{display:flex;gap:10px;margin-bottom:6px}
+.punch span{width:40px;height:40px;border-radius:50%;border:2px dashed #c9a46a;display:grid;place-items:center;font-size:22px;background:#fffaf0}
+.punch span.on{border-style:solid;border-color:#c9a46a;background:#fff;animation:pop .35s cubic-bezier(.2,.9,.2,1.3)}
+.treat-chips{display:flex;flex-wrap:wrap;gap:8px}
+.treat-chip{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:7px 8px 7px 12px;font-size:14px}
+.treat-chip button{border:0;background:none;color:#9e6c69;font-size:16px;cursor:pointer;padding:0 4px}
+.treat-add{margin-top:12px}
+.treat-add #treatEmoji{flex:0 0 56px;text-align:center}
+.treat-reveal{text-align:center}
+.treat-emoji{font-size:96px;line-height:1.1;margin:6px 0;animation:wiggle 1.2s ease-in-out infinite}
+@keyframes wiggle{0%,100%{transform:rotate(-6deg) scale(1)}50%{transform:rotate(6deg) scale(1.08)}}
+.treat-name{font-size:18px;margin:4px 0 18px}
+.treat-reveal .ghost{margin-bottom:10px}
+.treat-reveal .text-button{margin-top:12px}

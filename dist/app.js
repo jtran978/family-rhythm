@@ -1,5 +1,5 @@
 // Casa Yuffie: one household login, a profile per person.
-// Weigh-ins are per profile. Chores, bills, recipes and photos are shared.
+// Weigh-ins and sweet treats are per profile. Chores, errands, bills, recipes and photos are shared.
 
 const cfg = window.FAMILY_RHYTHM_CONFIG || {};
 const configured = /^https:\/\//.test(cfg.supabaseUrl || '') && !/PASTE_/.test(cfg.supabaseAnonKey || 'PASTE_');
@@ -20,7 +20,7 @@ const DEFAULT_CHORE_HOUR = 18;
 let session = null;
 let profiles = [];
 let me = null;
-const data = { weights: [], chores: [], bills: [], payments: [], recipes: [], photos: [] };
+const data = { weights: [], chores: [], errands: [], treatMenu: [], redemptions: [], bills: [], payments: [], recipes: [], photos: [] };
 
 // ---------- helpers ----------
 const dateKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -241,15 +241,20 @@ async function enterApp(profile) {
 // ---------- data ----------
 async function refresh() {
   if (!me) return;
-  const [w, c, b, p, r] = await Promise.all([
+  const [w, c, b, p, r, e, tm, tr] = await Promise.all([
     sb.from('weigh_ins').select('*').eq('profile_id', me.id).order('date', { ascending: false }).limit(400),
     sb.from('chores').select('*').order('created_at'),
     sb.from('bills').select('*').eq('active', true).order('next_due'),
     sb.from('bill_payments').select('*, bills(name)').order('paid_on', { ascending: false }).order('created_at', { ascending: false }).limit(300),
-    sb.from('recipes').select('*').order('created_at', { ascending: false }).limit(500)
+    sb.from('recipes').select('*').order('created_at', { ascending: false }).limit(500),
+    sb.from('errands').select('*').order('created_at').limit(2000),
+    sb.from('treat_menu').select('*').order('created_at'),
+    sb.from('treat_redemptions').select('*').eq('profile_id', me.id)
   ]);
-  if (oops(w.error || c.error || b.error || p.error || r.error, 'Couldn’t reach the cloud. Check your connection.')) return;
+  if (oops(w.error || c.error || b.error || p.error || r.error || e.error || tm.error || tr.error, 'Couldn’t reach the cloud. Check your connection.')) return;
   data.weights = w.data; data.chores = c.data; data.bills = b.data; data.payments = p.data; data.recipes = r.data;
+  data.errands = e.data; data.treatMenu = tm.data; data.redemptions = tr.data;
+  data.loaded = true;
   render();
 }
 
@@ -272,7 +277,8 @@ function render() {
   const logged = data.weights.some(x => x.date === today);
   $('#choreSummary').textContent = `${done} of ${data.chores.length}`;
   $('#weighSummary').textContent = logged ? 'Done today ✓' : scheduledToday() ? 'Due today' : `Next: ${nextWeighIn().split(',')[0]}`;
-  const wins = done + (logged ? 1 : 0);
+  const errandsToday = data.errands.filter(x => x.done && x.done_at && dateKey(new Date(x.done_at)) === today).length;
+  const wins = done + errandsToday + (logged ? 1 : 0);
   $('#todayProgress').textContent = `${wins} small win${wins === 1 ? '' : 's'}`;
 
   let status = 'Next weigh-in is ' + nextWeighIn();
@@ -280,7 +286,7 @@ function render() {
   if (logged) status = 'Today’s check-in is complete. Nicely done.';
   $('#weighStatus').textContent = status;
 
-  renderWeights(); renderChores(); renderBills(); renderRecipes();
+  renderWeights(); renderChores(); renderErrands(); renderBills(); renderRecipes();
 }
 const scheduledToday = () => WEIGH_DAYS.includes(new Date().getDay());
 function nextWeighIn() {
@@ -327,6 +333,123 @@ function renderChores() {
     if (!oops(error)) refresh();
   });
 }
+
+// ---------- annoying errands + sweet treats ----------
+// Errands are shared. Each finished errand counts for whoever did it; every 5 unlock a sweet treat.
+const TREAT_EVERY = 5;
+const DEFAULT_TREATS = [['🧋', 'Boba'], ['🍦', 'Ice cream'], ['🍪', 'Cookies'], ['🍩', 'Donut'], ['🍫', 'Chocolate'], ['🍰', 'Cake slice'], ['🧁', 'Cupcake'], ['🍭', 'Candy']];
+let seedingTreats = false;
+
+function treatStats() {
+  const mine = data.errands.filter(x => x.done && x.done_by === me.id).length;
+  const earned = Math.floor(mine / TREAT_EVERY);
+  return { mine, progress: mine % TREAT_EVERY, waiting: Math.max(0, earned - data.redemptions.length) };
+}
+
+function renderErrands() {
+  const { progress, waiting } = treatStats();
+  $('#punchCard').innerHTML = Array.from({ length: TREAT_EVERY }, (_, i) => `<span class="${i < progress ? 'on' : ''}">${i < progress ? '🍬' : ''}</span>`).join('');
+  const left = TREAT_EVERY - progress;
+  $('#treatProgress').textContent = `${progress} of ${TREAT_EVERY} done`;
+  $('#treatProgressNote').textContent = waiting
+    ? `You have ${waiting} sweet treat${waiting === 1 ? '' : 's'} waiting! 🎉`
+    : `${left} more until a sweet treat`;
+  $('#claimTreat').hidden = !waiting;
+  $('#errandSummary').textContent = waiting ? 'Treat waiting!' : `${progress} of ${TREAT_EVERY}`;
+  $('#errandSummaryNote').textContent = waiting ? 'Go claim your sweet treat' : 'Errands to your next treat';
+
+  const open = data.errands.filter(x => !x.done && !x.archived);
+  const done = data.errands.filter(x => x.done && !x.archived).sort((a, b) => (b.done_at || '').localeCompare(a.done_at || ''));
+  $('#errandList').innerHTML = open.map(x =>
+    `<div class="list-card"><button class="check" data-toggle-errand="${x.id}" aria-label="Mark done"></button><div class="grow"><strong>${esc(x.name)}</strong><small>Ugh. Someday.</small></div><button class="delete" data-delete-errand="${x.id}" aria-label="Delete errand">×</button></div>`
+  ).join('') || '<div class="empty">No annoying errands right now. Enjoy it while it lasts.</div>';
+  $('#doneErrandsHeading').hidden = !done.length;
+  $('#doneErrandList').innerHTML = done.map(x => {
+    const who = profileName(x.done_by);
+    return `<div class="list-card"><button class="check done" data-toggle-errand="${x.id}" aria-label="Mark not done">✓</button><div class="grow completed"><strong>${esc(x.name)}</strong><small>${who ? `Done by ${esc(who)}` : 'Done'}</small></div></div>`;
+  }).join('');
+  $$('[data-toggle-errand]').forEach(b => b.onclick = () => toggleErrand(b.dataset.toggleErrand));
+  $$('[data-delete-errand]').forEach(b => b.onclick = async () => {
+    const { error } = await sb.from('errands').delete().eq('id', b.dataset.deleteErrand);
+    if (!oops(error)) refresh();
+  });
+
+  if (data.loaded && !data.treatMenu.length && !seedingTreats) seedTreatMenu();
+  $('#treatMenu').innerHTML = data.treatMenu.map(t =>
+    `<span class="treat-chip">${esc(t.emoji)} ${esc(t.name)}<button data-delete-treat="${t.id}" aria-label="Remove ${escAttr(t.name)}">×</button></span>`
+  ).join('');
+  $$('[data-delete-treat]').forEach(b => b.onclick = async () => {
+    if (data.treatMenu.length <= 1) return toast('Keep at least one treat on the menu');
+    const { error } = await sb.from('treat_menu').delete().eq('id', b.dataset.deleteTreat);
+    if (!oops(error)) refresh();
+  });
+}
+
+async function seedTreatMenu() {
+  seedingTreats = true;
+  const { error } = await sb.from('treat_menu').insert(DEFAULT_TREATS.map(([emoji, name]) => ({ emoji, name })));
+  if (!oops(error, 'Couldn’t set up the treat menu')) await refresh();
+  seedingTreats = false;
+}
+
+async function toggleErrand(id) {
+  const errand = data.errands.find(x => x.id === id);
+  const done = !errand.done;
+  const before = treatStats();
+  const { error } = await sb.from('errands').update({ done, done_by: done ? me.id : null }).eq('id', id);
+  if (oops(error)) return;
+  await refresh();
+  if (!done) return;
+  const after = treatStats();
+  if (after.waiting > before.waiting) openTreat(true);
+  else toast(['Ugh, done. Nice.', 'One less annoying thing.', 'Look at you, adulting.', 'Crushed it.'][Math.floor(Math.random() * 4)]);
+}
+
+$('#errandForm').onsubmit = async e => {
+  e.preventDefault();
+  const { error } = await sb.from('errands').insert({ name: $('#errandName').value.trim() });
+  if (oops(error, 'Couldn’t add that errand')) return;
+  $('#errandName').value = ''; toast('Errand added. Ugh.'); refresh();
+};
+
+$('#clearErrands').onclick = async () => {
+  const ids = data.errands.filter(x => x.done && !x.archived).map(x => x.id);
+  if (!ids.length) return;
+  const { error } = await sb.from('errands').update({ archived: true }).in('id', ids);
+  if (!oops(error)) refresh();
+};
+
+$('#treatForm').onsubmit = async e => {
+  e.preventDefault();
+  const { error } = await sb.from('treat_menu').insert({ name: $('#treatName').value.trim(), emoji: $('#treatEmoji').value.trim() || '🍰' });
+  if (oops(error, 'Couldn’t add that treat')) return;
+  $('#treatName').value = ''; $('#treatEmoji').value = ''; refresh();
+};
+
+let pickedTreat = null;
+function pickTreat() {
+  const menu = data.treatMenu.length ? data.treatMenu : DEFAULT_TREATS.map(([emoji, name]) => ({ emoji, name }));
+  const options = menu.length > 1 ? menu.filter(t => t.name !== pickedTreat?.name) : menu;
+  pickedTreat = options[Math.floor(Math.random() * options.length)];
+  $('#treatEmojiBig').textContent = pickedTreat.emoji;
+  $('#treatPicked').textContent = pickedTreat.name;
+}
+function openTreat(justUnlocked) {
+  $('#treatHeadline').textContent = justUnlocked ? `${TREAT_EVERY} annoying errands done!` : 'Your treat is waiting';
+  pickedTreat = null;
+  pickTreat();
+  $('#treatOverlay').hidden = false;
+}
+$('#claimTreat').onclick = () => openTreat(false);
+$('#spinTreat').onclick = pickTreat;
+$('#saveTreat').onclick = () => { $('#treatOverlay').hidden = true; toast('Saved. It’ll be here when you want it.'); };
+$('#redeemTreat').onclick = async () => {
+  const { error } = await sb.from('treat_redemptions').insert({ profile_id: me.id, treat: `${pickedTreat.emoji} ${pickedTreat.name}` });
+  if (oops(error, 'Couldn’t claim that treat')) return;
+  $('#treatOverlay').hidden = true;
+  toast(`Enjoy your ${pickedTreat.name.toLowerCase()}! ${pickedTreat.emoji}`);
+  refresh();
+};
 
 // ---------- bills (shared by the household) ----------
 const money = n => n == null ? '' : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);

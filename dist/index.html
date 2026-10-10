@@ -105,11 +105,18 @@
           <strong id="choreSummary">0 of 0</strong>
           <small>Chores complete</small>
         </button>
-        <button class="summary-card wide" data-go="bills">
+        <button class="summary-card treat" data-go="errands">
+          <span class="summary-icon">🍬</span>
+          <strong id="errandSummary">0 of 5</strong>
+          <small id="errandSummaryNote">Errands to your next treat</small>
+        </button>
+        <button class="summary-card plain" data-go="bills">
           <span class="summary-icon">$</span>
-          <div><strong id="billSummary">No bills yet</strong><small id="billSummaryNext">Add your household bills</small></div>
+          <strong id="billSummary">No bills yet</strong>
+          <small id="billSummaryNext">Add your household bills</small>
         </button>
       </div>
+      <button class="list-card photo-link" data-go="photos"><span class="summary-icon">🔒</span><div class="grow"><strong>Photo library</strong><small>Locked with the photo PIN</small></div><span aria-hidden="true">›</span></button>
 
       <div class="section-heading"><h2>Recent weigh-ins</h2><button class="text-button" data-go="weighins">See all</button></div>
       <div id="recentWeights" class="stack"></div>
@@ -138,6 +145,31 @@
         <button class="primary" type="submit">Add chore</button>
       </form>
       <div id="choreList" class="stack roomy"></div>
+    </section>
+
+    <section id="errands" class="view" aria-labelledby="errands-title">
+      <div class="page-heading"><p class="eyebrow">Ugh, fine</p><h2 id="errands-title">Annoying Errands</h2><p>The stuff nobody wants to do. Knock out 5 and you unlock a sweet treat.</p></div>
+      <div class="treat-card">
+        <div class="punch" id="punchCard" aria-hidden="true"></div>
+        <strong id="treatProgress">0 of 5 done</strong>
+        <small id="treatProgressNote">5 more until a sweet treat</small>
+        <button id="claimTreat" class="primary" hidden>Open your treat</button>
+      </div>
+      <form id="errandForm" class="inline-form">
+        <input id="errandName" required maxlength="80" placeholder="Return that package…" aria-label="Errand" />
+        <button class="primary" type="submit">Add</button>
+      </form>
+      <div id="errandList" class="stack roomy"></div>
+      <div class="section-heading" id="doneErrandsHeading" hidden><h2>Done</h2><button class="text-button" id="clearErrands">Clear list</button></div>
+      <div id="doneErrandList" class="stack"></div>
+      <div class="section-heading"><h2>Treat menu</h2></div>
+      <p class="muted small-note">A random one is picked when a treat unlocks.</p>
+      <div id="treatMenu" class="treat-chips"></div>
+      <form id="treatForm" class="inline-form treat-add">
+        <input id="treatEmoji" maxlength="4" placeholder="🍩" aria-label="Treat emoji" />
+        <input id="treatName" required maxlength="40" placeholder="Add a treat" aria-label="Treat name" />
+        <button class="primary" type="submit">Add</button>
+      </form>
     </section>
 
     <section id="bills" class="view" aria-labelledby="bills-title">
@@ -195,9 +227,9 @@
     <button data-view="home" class="active"><span>⌂</span>Today</button>
     <button data-view="weighins"><span>◒</span>Weigh-ins</button>
     <button data-view="chores"><span>✓</span>Chores</button>
+    <button data-view="errands"><span>🍬</span>Errands</button>
     <button data-view="bills"><span>$</span>Bills</button>
     <button data-view="recipes"><span>❦</span>Recipes</button>
-    <button data-view="photos"><span>▧</span>Photos</button>
   </nav>
 
   <dialog id="weighDialog">
@@ -295,6 +327,18 @@
       </form>
     </div>
   </dialog>
+
+  <div id="treatOverlay" class="reward" hidden>
+    <div class="reward-card treat-reveal">
+      <p class="eyebrow">Sweet treat unlocked</p>
+      <h2 id="treatHeadline">5 annoying errands done!</h2>
+      <div class="treat-emoji" id="treatEmojiBig">🍰</div>
+      <p class="treat-name">You’ve earned <strong id="treatPicked">a sweet treat</strong></p>
+      <button id="spinTreat" class="ghost full">Pick a different treat</button>
+      <button id="redeemTreat" class="primary full">Claim it now</button>
+      <button id="saveTreat" class="text-button center">Save it for later</button>
+    </div>
+  </div>
 
   <div id="reward" class="reward" hidden>
     <div class="reward-card">

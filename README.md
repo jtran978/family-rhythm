@@ -1,9 +1,9 @@
 # Casa Yuffie
 
-A gentle household app: Monday and Friday weigh-ins with photo rewards, a shared chore list, household bills with reminders and payment history, and a recipe box that imports recipes from a link.
+A gentle household app: Monday and Friday weigh-ins with photo rewards, a shared chore list, Annoying Errands that earn a sweet treat every 5, household bills with reminders and payment history, and a recipe box that imports recipes from a link.
 
 - One household login (Supabase Auth), with a "Who's checking in?" profile per person (each with an emoji or their own photo)
-- Weigh-ins are per profile; chores, bills, recipes and photos are shared
+- Weigh-ins and sweet treats are per profile; chores, errands, bills, recipes and photos are shared
 - Data in Supabase Postgres, photos in a private Supabase Storage bucket
 - Hosted on GitHub Pages from `dist/`
 - Reminders via Web Push, sent hourly by GitHub Actions (`.github/workflows/reminders.yml`), which also keeps the free Supabase project from pausing
