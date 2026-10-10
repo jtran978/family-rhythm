@@ -144,3 +144,8 @@ dialog.sheet{max-width:640px;width:calc(100% - 20px);max-height:calc(100dvh - 30
 .treat-name{font-size:18px;margin:4px 0 18px}
 .treat-reveal .ghost{margin-bottom:10px}
 .treat-reveal .text-button{margin-top:12px}
+
+/* ---- per-person settings ---- */
+.entry-form .check-row,.check-row{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:700;cursor:pointer;flex-wrap:wrap}
+.check-row input{width:20px;height:20px;accent-color:var(--sage)}
+.check-row small{font-weight:500}

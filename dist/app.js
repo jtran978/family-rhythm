@@ -163,6 +163,7 @@ function openProfileForm(profile = null) {
   $('#profileFormTitle').textContent = profile ? `Edit ${profile.name}` : 'Add a person';
   $('#saveProfile').textContent = profile ? 'Save' : 'Add';
   $('#profileName').value = profile?.name || '';
+  $('#profileWeighReminders').checked = profile ? profile.weigh_reminders !== false : true;
   const faces = FACES.includes(chosenFace) ? FACES : [chosenFace, ...FACES];
   $('#emojiRow').innerHTML = faces.map(f => `<button type="button" data-face="${f}" class="${f === chosenFace ? 'selected' : ''}">${f}</button>`).join('');
   $$('[data-face]').forEach(b => b.onclick = () => {
@@ -197,7 +198,7 @@ $('#removeProfilePhoto').onclick = () => {
 
 $('#profileForm').onsubmit = async e => {
   e.preventDefault();
-  const fields = { name: $('#profileName').value.trim(), emoji: chosenFace };
+  const fields = { name: $('#profileName').value.trim(), emoji: chosenFace, weigh_reminders: $('#profileWeighReminders').checked };
   const { data: saved, error } = editingProfile
     ? await sb.from('profiles').update(fields).eq('id', editingProfile.id).select().single()
     : await sb.from('profiles').insert(fields).select().single();
@@ -1065,7 +1066,9 @@ async function renderReminderCard() {
   const sub = await currentSubscription().catch(() => null);
   if (sub) {
     btn.textContent = 'Test';
-    status.textContent = `On for ${me.name} on this phone. Mondays and Fridays at 8am, plus each open chore at its reminder time.`;
+    status.textContent = me.weigh_reminders === false
+      ? `On for ${me.name} on this phone: chores and bills at their reminder times. Weigh-in reminders are off in ${me.name}’s profile.`
+      : `On for ${me.name} on this phone. Mondays and Fridays at 8am, plus chores and bills at their reminder times.`;
   } else {
     btn.textContent = 'Turn on';
     status.textContent = 'Weigh-in mornings, plus each chore at the time you choose.';

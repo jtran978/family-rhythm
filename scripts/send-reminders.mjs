@@ -59,6 +59,9 @@ const doWeigh = REMINDER_FORCE === 'weigh' || (weighDay && (hour === WEIGH_IN_HO
 if (doWeigh && subs.length) {
   const { data: logged } = await db.from('weigh_ins').select('profile_id').eq('date', today);
   const done = new Set((logged || []).map(r => r.profile_id));
+  // People with weigh-in reminders turned off in their profile are skipped.
+  const { data: optedOut } = await db.from('profiles').select('id').eq('weigh_reminders', false);
+  for (const p of optedOut || []) done.add(p.id);
   const evening = hour === WEIGH_IN_NUDGE_HOUR;
   for (const sub of subs) {
     if (!sub.profile_id || done.has(sub.profile_id)) continue;
