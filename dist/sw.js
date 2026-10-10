@@ -1,4 +1,4 @@
-const CACHE = 'family-rhythm-v9';
+const CACHE = 'family-rhythm-v10';
 const SHELL = ['./', './index.html', './styles.css', './app.js', './config.js', './manifest.webmanifest', './icon.svg', './icon-180.png', './icon-512.png'];
 
 self.addEventListener('install', event => {
@@ -32,7 +32,7 @@ self.addEventListener('fetch', event => {
 self.addEventListener('push', event => {
   let payload = {};
   try { payload = event.data ? event.data.json() : {}; } catch { payload = { body: event.data && event.data.text() }; }
-  const title = payload.title || 'Family Rhythm';
+  const title = payload.title || 'Casa Yuffie';
   event.waitUntil(self.registration.showNotification(title, {
     body: payload.body || 'A gentle check-in is waiting.',
     icon: './icon-512.png',

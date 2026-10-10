@@ -1,4 +1,4 @@
-// Family Rhythm: one household login, a profile per person.
+// Casa Yuffie: one household login, a profile per person.
 // Weigh-ins are per profile. Chores, bills, recipes and photos are shared.
 
 const cfg = window.FAMILY_RHYTHM_CONFIG || {};
@@ -954,7 +954,7 @@ $('#enableReminders').onclick = async () => {
     const reg = await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
     if (sub) {
-      reg.showNotification('Family Rhythm', { body: `Reminders are working for ${me.name} ♡`, icon: './icon-512.png' });
+      reg.showNotification('Casa Yuffie', { body: `Reminders are working for ${me.name} ♡`, icon: './icon-512.png' });
       return;
     }
     if (!cfg.vapidPublicKey || /PASTE_/.test(cfg.vapidPublicKey)) { toast('Reminders aren’t set up yet'); return; }

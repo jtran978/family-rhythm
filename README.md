@@ -1,4 +1,4 @@
-# Family Rhythm
+# Casa Yuffie
 
 A gentle household app: Monday and Friday weigh-ins with photo rewards, a shared chore list, household bills with reminders and payment history, and a recipe box that imports recipes from a link.
 
