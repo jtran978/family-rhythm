@@ -95,6 +95,10 @@
           <strong id="choreSummary">0 of 0</strong>
           <small>Chores complete</small>
         </button>
+        <button class="summary-card wide" data-go="bills">
+          <span class="summary-icon">$</span>
+          <div><strong id="billSummary">No bills yet</strong><small id="billSummaryNext">Add your household bills</small></div>
+        </button>
       </div>
 
       <div class="section-heading"><h2>Recent weigh-ins</h2><button class="text-button" data-go="weighins">See all</button></div>
@@ -124,6 +128,29 @@
         <button class="primary" type="submit">Add chore</button>
       </form>
       <div id="choreList" class="stack roomy"></div>
+    </section>
+
+    <section id="bills" class="view" aria-labelledby="bills-title">
+      <div class="page-heading"><p class="eyebrow">Stay ahead</p><h2 id="bills-title">Bills</h2><p>Shared with the household. Mark a bill paid and it moves to its next due date.</p></div>
+      <div class="bill-totals">
+        <div><small>Due in the next 30 days</small><strong id="billsDueTotal">$0</strong></div>
+        <div><small id="billsPaidLabel">Paid this month</small><strong id="billsPaidTotal">$0</strong></div>
+      </div>
+      <button id="addBill" class="primary full">Add a bill</button>
+      <div id="billList" class="stack roomy"></div>
+      <div class="section-heading"><h2>Payment history</h2></div>
+      <div id="billHistory" class="stack"></div>
+    </section>
+
+    <section id="recipes" class="view" aria-labelledby="recipes-title">
+      <div class="page-heading"><p class="eyebrow">What’s for dinner</p><h2 id="recipes-title">Recipes</h2><p>Paste a link to a recipe. The ingredients and steps are saved here, without the ads and life stories.</p></div>
+      <form id="recipeForm" class="inline-form">
+        <input id="recipeUrl" type="url" required placeholder="Paste a recipe link" aria-label="Recipe link" autocomplete="off" />
+        <button class="primary" type="submit" id="recipeSave">Save</button>
+      </form>
+      <p id="recipeMsg" class="recipe-msg" hidden></p>
+      <input id="recipeSearch" class="search" type="search" placeholder="Search recipes or ingredients" aria-label="Search recipes" hidden />
+      <div id="recipeList" class="stack roomy"></div>
     </section>
 
     <section id="photos" class="view" aria-labelledby="photos-title">
@@ -157,6 +184,8 @@
     <button data-view="home" class="active"><span>⌂</span>Today</button>
     <button data-view="weighins"><span>◒</span>Weigh-ins</button>
     <button data-view="chores"><span>✓</span>Chores</button>
+    <button data-view="bills"><span>$</span>Bills</button>
+    <button data-view="recipes"><span>❦</span>Recipes</button>
     <button data-view="photos"><span>▧</span>Photos</button>
   </nav>
 
@@ -169,6 +198,91 @@
       <label>Weight<div class="weight-field"><input id="weightValue" type="number" required min="1" max="999" step="0.1" inputmode="decimal" /><select id="weightUnit"><option>lb</option><option>kg</option></select></div></label>
       <button type="submit" class="primary full">Save & reveal a photo</button>
     </form>
+  </dialog>
+
+  <dialog id="billDialog">
+    <form id="billForm" method="dialog" class="dialog-card">
+      <button class="dialog-close" value="cancel" formnovalidate aria-label="Close">×</button>
+      <p class="eyebrow" id="billDialogEyebrow">New bill</p>
+      <h2 id="billDialogTitle">Add a bill</h2>
+      <div class="dialog-fields">
+        <label>Name<input id="billName" required maxlength="60" placeholder="Electric, rent, phone…" /></label>
+        <div class="field-pair">
+          <label>Usual amount<input id="billAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Optional" /></label>
+          <label>Next due<input id="billDue" type="date" required /></label>
+        </div>
+        <label>Repeats<select id="billFrequency">
+          <option value="monthly">Monthly</option><option value="weekly">Weekly</option><option value="biweekly">Every 2 weeks</option>
+          <option value="yearly">Yearly</option><option value="once">One time</option>
+        </select></label>
+        <div class="field-pair">
+          <label>Remind<select id="billRemindDays">
+            <option value="">No reminder</option><option value="0">On the due date</option><option value="1">1 day before</option>
+            <option value="2">2 days before</option><option value="3">3 days before</option><option value="5">5 days before</option>
+            <option value="7">1 week before</option><option value="14">2 weeks before</option>
+          </select></label>
+          <label>At<select id="billRemindHour"></select></label>
+        </div>
+        <label>Payment link<input id="billUrl" type="url" maxlength="500" placeholder="https://… (optional)" /></label>
+      </div>
+      <p id="billError" class="form-error" hidden></p>
+      <button type="submit" value="save" class="primary full">Save bill</button>
+      <button type="button" id="deleteBill" class="text-button danger center" hidden>Delete this bill</button>
+    </form>
+  </dialog>
+
+  <dialog id="payDialog">
+    <form id="payForm" method="dialog" class="dialog-card">
+      <button class="dialog-close" value="cancel" formnovalidate aria-label="Close">×</button>
+      <p class="eyebrow">Nice work</p>
+      <h2 id="payTitle">Mark paid</h2>
+      <p class="muted" id="payDueNote"></p>
+      <div class="dialog-fields">
+        <div class="field-pair">
+          <label>Amount paid<input id="payAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Optional" /></label>
+          <label>Paid on<input id="payDate" type="date" required /></label>
+        </div>
+      </div>
+      <button type="submit" value="save" class="primary full">Save payment</button>
+    </form>
+  </dialog>
+
+  <dialog id="recipeDialog" class="sheet">
+    <div class="dialog-card">
+      <button type="button" class="dialog-close" id="closeRecipe" aria-label="Close">×</button>
+      <div id="recipeView">
+        <img id="recipeImage" class="recipe-hero" alt="" referrerpolicy="no-referrer" hidden />
+        <p class="eyebrow" id="recipeSite"></p>
+        <h2 id="recipeTitle"></h2>
+        <p class="muted" id="recipeMeta"></p>
+        <a id="recipeLink" class="text-button" target="_blank" rel="noopener noreferrer">Open the original ↗</a>
+        <h3>Ingredients</h3>
+        <p class="muted small-note">Tap to cross off as you go.</p>
+        <ul id="recipeIngredients" class="ingredients"></ul>
+        <h3>Steps</h3>
+        <div id="recipeSteps"></div>
+        <h3>Notes</h3>
+        <textarea id="recipeNotes" class="notes" maxlength="4000" placeholder="Swaps, tweaks, who loved it…"></textarea>
+        <div class="inline-form recipe-actions">
+          <button type="button" class="ghost grow" id="editRecipe">Edit</button>
+          <button type="button" class="ghost grow danger-text" id="deleteRecipe">Delete</button>
+        </div>
+      </div>
+      <form id="recipeEditForm" class="dialog-fields" hidden>
+        <h2>Edit recipe</h2>
+        <label>Title<input id="editTitle" required maxlength="200" /></label>
+        <div class="field-pair">
+          <label>Total time (minutes)<input id="editMinutes" type="number" min="1" max="10000" inputmode="numeric" /></label>
+          <label>Serves<input id="editYields" maxlength="80" /></label>
+        </div>
+        <label>Ingredients <small class="muted">one per line</small><textarea id="editIngredients" rows="8"></textarea></label>
+        <label>Steps <small class="muted">one per line; start a line with # for a heading</small><textarea id="editSteps" rows="10"></textarea></label>
+        <div class="inline-form">
+          <button type="button" class="ghost grow" id="cancelEditRecipe">Cancel</button>
+          <button type="submit" class="primary grow">Save</button>
+        </div>
+      </form>
+    </div>
   </dialog>
 
   <div id="reward" class="reward" hidden>

@@ -1,9 +1,9 @@
 # Family Rhythm
 
-A gentle household app: Monday and Friday weigh-ins with photo rewards and a shared chore list with reminders.
+A gentle household app: Monday and Friday weigh-ins with photo rewards, a shared chore list, household bills with reminders and payment history, and a recipe box that imports recipes from a link.
 
 - One household login (Supabase Auth), with a "Who's checking in?" profile per person
-- Weigh-ins are per profile; chores and photos are shared
+- Weigh-ins are per profile; chores, bills, recipes and photos are shared
 - Data in Supabase Postgres, photos in a private Supabase Storage bucket
 - Hosted on GitHub Pages from `dist/`
 - Reminders via Web Push, sent hourly by GitHub Actions (`.github/workflows/reminders.yml`), which also keeps the free Supabase project from pausing
@@ -17,6 +17,13 @@ A gentle household app: Monday and Friday weigh-ins with photo rewards and a sha
 | `supabase/schema.sql` | Tables, Row Level Security, photo bucket (fresh setup) |
 | `supabase/migrations/` | Updates to run after `schema.sql`, in order (each is safe to re-run) |
 | `scripts/send-reminders.mjs` | Reminder sender + keep-awake ping |
+| `supabase/functions/import-recipe/` | Edge Function that reads a recipe page for the Recipes tab |
+
+## Recipes
+
+Paste a recipe link and the `import-recipe` Edge Function fetches the page and reads the structured recipe data most sites embed for search engines (title, photo, time, servings, ingredients, steps). Some sites, such as Allrecipes and Serious Eats, block apps from reading them; the link is still saved and the recipe can be filled in with Edit.
+
+Deploy the function once: Supabase dashboard > Edge Functions > Deploy a new function > Via Editor, name it `import-recipe`, paste `supabase/functions/import-recipe/index.ts`, Deploy. It only answers signed-in household logins.
 
 ## Photo PIN
 
@@ -32,8 +39,9 @@ Forgot the PIN? In Supabase SQL Editor run `update public.photo_lock set pin_has
 
 - Mon and Fri, 8am: weigh-in reminder for each profile that hasn't logged yet
 - Mon and Fri, 7pm: gentle nudge if still not logged
+- Each bill: once per due date, the number of days before and at the time picked for it in the app
 - Each chore: daily at the time picked for it in the app, until it's marked done (or set to "No reminder")
 
-Change the weigh-in hours at the top of `scripts/send-reminders.mjs`. GitHub runs the sender once an hour, a few minutes past, and sometimes late, so reminders land within the hour, not to the minute. Run the workflow manually with `force` set to `weigh` or `chores` to send a test.
+Change the weigh-in hours at the top of `scripts/send-reminders.mjs`. GitHub runs the sender once an hour, a few minutes past, and sometimes late, so reminders land within the hour, not to the minute. Run the workflow manually with `force` set to `weigh`, `chores` or `bills` to send a test.
 
 On iPhone, reminders only work after the app is added to the Home Screen (iOS 16.4+) and turned on from the Today screen.

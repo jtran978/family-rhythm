@@ -9,14 +9,14 @@ const TZ = 'America/New_York';
 const WEIGH_DAYS = ['Mon', 'Fri'];
 const WEIGH_IN_HOUR = 8;         // morning reminder on weigh-in days
 const WEIGH_IN_NUDGE_HOUR = 19;  // evening nudge if still not logged
-const CHORE_CATCH_UP_HOURS = 2;  // GitHub sometimes runs late or skips an hour
-// Each chore's reminder hour is set in the app (chores.remind_hour).
+const CATCH_UP_HOURS = 2;  // GitHub sometimes runs late or skips an hour
+// Each chore and bill sets its own reminder hour in the app.
 
 const {
   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
   VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY,
   VAPID_SUBJECT = 'mailto:family-rhythm@example.com',
-  REMINDER_FORCE = ''           // 'weigh' or 'chores' to send a test right now
+  REMINDER_FORCE = ''           // 'weigh', 'chores' or 'bills' to send a test right now
 } = process.env;
 
 for (const [k, v] of Object.entries({ SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY })) {
@@ -74,7 +74,7 @@ if (subs.length) {
   const force = REMINDER_FORCE === 'chores';
   let q = db.from('chores').select('id, owner, name').eq('done', false).not('remind_hour', 'is', null);
   if (!force) q = q
-    .lte('remind_hour', hour).gte('remind_hour', hour - CHORE_CATCH_UP_HOURS)
+    .lte('remind_hour', hour).gte('remind_hour', hour - CATCH_UP_HOURS)
     .or(`last_reminded_on.is.null,last_reminded_on.lt.${today}`);
   const { data: due, error: choreError } = await q;
   if (choreError) console.error(choreError);
@@ -89,6 +89,37 @@ if (subs.length) {
   }
   if (!force && due?.length) {
     await db.from('chores').update({ last_reminded_on: today }).in('id', due.map(c => c.id));
+  }
+}
+
+// Bills: one reminder per due date, remind_days before it at remind_hour. A bill added
+// after its reminder day (or already overdue) is reminded at the next matching hour.
+// A forced test sends every active bill that has a reminder.
+const dayDiff = (a, b) => Math.round((Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`)) / 86400000);
+const money = n => n == null ? '' : ` (${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)})`;
+function dueText(nextDue) {
+  const days = dayDiff(nextDue, today);
+  if (days === 0) return 'is due today';
+  if (days === 1) return 'is due tomorrow';
+  if (days < 0) return `was due ${days === -1 ? 'yesterday' : `${-days} days ago`}`;
+  return `is due in ${days} days`;
+}
+
+if (subs.length) {
+  const force = REMINDER_FORCE === 'bills';
+  let q = db.from('bills').select('id, owner, name, amount, next_due, remind_days, last_reminded_for')
+    .eq('active', true).not('remind_days', 'is', null);
+  if (!force) q = q.lte('remind_hour', hour).gte('remind_hour', hour - CATCH_UP_HOURS);
+  const { data: bills, error: billError } = await q;
+  if (billError) console.error(billError);
+
+  const due = (bills || []).filter(b => force ||
+    (dayDiff(b.next_due, today) <= b.remind_days && b.last_reminded_for !== b.next_due));
+  for (const b of due) {
+    for (const sub of subs.filter(s => s.owner === b.owner)) {
+      await send(sub, { title: 'Bill reminder', body: `${b.name}${money(b.amount)} ${dueText(b.next_due)}.`, tag: `bill-${b.id}` });
+    }
+    if (!force) await db.from('bills').update({ last_reminded_for: b.next_due }).eq('id', b.id);
   }
 }
 

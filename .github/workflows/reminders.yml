@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       force:
-        description: 'Send a test now (weigh or chores). Leave blank for a normal run.'
+        description: 'Send a test now (weigh, chores or bills). Leave blank for a normal run.'
         required: false
         default: ''
 
