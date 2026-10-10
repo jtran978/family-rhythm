@@ -1,0 +1,41 @@
+name: Reminders
+
+on:
+  schedule:
+    - cron: '7 * * * *'   # hourly; the script decides what to send based on New York time
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Send a test now (weigh or chores). Leave blank for a normal run.'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-audit --no-fund
+      - run: node scripts/send-reminders.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+          REMINDER_FORCE: ${{ inputs.force }}
+      # GitHub turns off scheduled workflows after 60 days without repo activity.
+      # Re-enabling it on every run keeps the hourly schedule alive.
+      - name: Keep the schedule alive
+        if: always()
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/reminders.yml/enable"
+        env:
+          GH_TOKEN: ${{ github.token }}

@@ -5,28 +5,76 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#f6f1e7" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Family Rhythm" />
   <title>Family Rhythm</title>
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="apple-touch-icon" href="./icon.svg" />
+  <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="./icon-180.png" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
-<body>
+<body class="locked">
+
+  <!-- Shown until config.js is filled in -->
+  <section id="setupGate" class="gate">
+    <div class="gate-card">
+      <p class="eyebrow">Almost ready</p>
+      <h2>Family Rhythm</h2>
+      <p class="muted">Add your Supabase details to <code>config.js</code> to finish setting things up.</p>
+    </div>
+  </section>
+
+  <!-- Household login -->
+  <section id="authGate" class="gate">
+    <form id="loginForm" class="gate-card entry-form">
+      <div class="gate-mark" aria-hidden="true">♡</div>
+      <p class="eyebrow">Welcome home</p>
+      <h2>Family Rhythm</h2>
+      <label>Email<input id="loginEmail" type="email" autocomplete="username" required /></label>
+      <label>Password<input id="loginPassword" type="password" autocomplete="current-password" required /></label>
+      <p id="loginError" class="form-error" hidden></p>
+      <button class="primary full" type="submit">Sign in</button>
+    </form>
+  </section>
+
+  <!-- Who's checking in? -->
+  <section id="pickerGate" class="gate">
+    <div class="gate-card">
+      <p class="eyebrow">Hello again</p>
+      <h2>Who’s checking in?</h2>
+      <div id="profileList" class="profile-list"></div>
+      <form id="profileForm" class="entry-form flat" hidden>
+        <label>Name<input id="profileName" maxlength="40" required placeholder="First name" /></label>
+        <div>
+          <span class="field-label">Pick a face</span>
+          <div id="emojiRow" class="emoji-row"></div>
+        </div>
+        <div class="inline-form">
+          <button type="button" id="cancelProfile" class="ghost">Cancel</button>
+          <button type="submit" class="primary grow">Add</button>
+        </div>
+      </form>
+      <button id="signOut" class="text-button center">Sign out of this phone</button>
+    </div>
+  </section>
+
   <main class="app-shell">
     <header class="topbar">
       <div>
         <p class="eyebrow" id="todayLabel"></p>
         <h1>Family Rhythm</h1>
       </div>
-      <div class="avatar" aria-hidden="true">♡</div>
+      <button id="switchProfile" class="avatar" aria-label="Switch person">
+        <span id="avatarFace">♡</span>
+      </button>
     </header>
 
     <section id="home" class="view active" aria-labelledby="home-title">
       <div class="hero-card">
         <div>
           <p class="eyebrow">A gentle check-in</p>
-          <h2 id="home-title">Today, together.</h2>
+          <h2 id="home-title">Hi, <span id="helloName">there</span>.</h2>
           <p id="weighStatus" class="muted"></p>
         </div>
         <button id="openWeighIn" class="primary">Log weigh-in</button>
@@ -39,7 +87,7 @@
       <div class="summary-grid">
         <button class="summary-card rose" data-go="food">
           <span class="summary-icon">◌</span>
-          <strong id="mealCount">0 meals</strong>
+          <strong id="mealCount">0 entries</strong>
           <small>Food journal</small>
         </button>
         <button class="summary-card sage" data-go="chores">
@@ -51,6 +99,15 @@
 
       <div class="section-heading"><h2>Recent weigh-ins</h2><button class="text-button" data-go="weighins">See all</button></div>
       <div id="recentWeights" class="stack"></div>
+
+      <div class="section-heading"><h2>Reminders</h2></div>
+      <div class="list-card reminder-card">
+        <div class="grow">
+          <strong id="reminderTitle">Gentle reminders</strong>
+          <small id="reminderStatus">Weigh-in mornings and an evening nudge for open chores.</small>
+        </div>
+        <button id="enableReminders" class="primary small">Turn on</button>
+      </div>
     </section>
 
     <section id="weighins" class="view" aria-labelledby="weigh-title">
@@ -70,7 +127,7 @@
     </section>
 
     <section id="chores" class="view" aria-labelledby="chores-title">
-      <div class="page-heading"><p class="eyebrow">Small wins count</p><h2 id="chores-title">Chores</h2><p>A shared view of what needs a little love.</p></div>
+      <div class="page-heading"><p class="eyebrow">Small wins count</p><h2 id="chores-title">Chores</h2><p>A shared list for the whole household.</p></div>
       <form id="choreForm" class="inline-form">
         <input id="choreName" required maxlength="80" placeholder="Add a chore" aria-label="Chore name" />
         <button class="primary" type="submit">Add</button>
@@ -81,10 +138,10 @@
     <section id="photos" class="view" aria-labelledby="photos-title">
       <div class="page-heading"><p class="eyebrow">The good stuff</p><h2 id="photos-title">Photo rewards</h2><p>Add favorite family pictures. One is revealed after each Monday or Friday weigh-in.</p></div>
       <label class="upload-card">
-        <span>＋</span><strong>Add family photos</strong><small>Choose several at once</small>
+        <span>＋</span><strong id="uploadLabel">Add family photos</strong><small>Choose several at once</small>
         <input id="photoInput" type="file" accept="image/*" multiple hidden />
       </label>
-      <p class="privacy-note">Photos stay in this browser on this device.</p>
+      <p class="privacy-note">Photos are private to your household login and shared between your profiles.</p>
       <div id="photoGrid" class="photo-grid"></div>
     </section>
   </main>
@@ -99,11 +156,11 @@
 
   <dialog id="weighDialog">
     <form id="weighForm" method="dialog" class="dialog-card">
-      <button class="dialog-close" value="cancel" aria-label="Close">×</button>
+      <button class="dialog-close" value="cancel" formnovalidate aria-label="Close">×</button>
       <p class="eyebrow">A moment for you</p>
       <h2>Monday & Friday check-in</h2>
-      <p class="muted">The reward is for checking in—not for any particular number.</p>
-      <label>Weight<div class="weight-field"><input id="weightValue" type="number" required min="1" max="1000" step="0.1" inputmode="decimal" /><select id="weightUnit"><option>lb</option><option>kg</option></select></div></label>
+      <p class="muted">The reward is for checking in, not for any particular number.</p>
+      <label>Weight<div class="weight-field"><input id="weightValue" type="number" required min="1" max="999" step="0.1" inputmode="decimal" /><select id="weightUnit"><option>lb</option><option>kg</option></select></div></label>
       <button type="submit" class="primary full">Save & reveal a photo</button>
     </form>
   </dialog>
@@ -119,7 +176,10 @@
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="./config.js"></script>
   <script src="./app.js"></script>
-  <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js');</script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');</script>
 </body>
 </html>

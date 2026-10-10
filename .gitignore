@@ -1,0 +1,4 @@
+node_modules/
+.DS_Store
+family-rhythm-site.tar.gz
+secrets.local.txt

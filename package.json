@@ -1,0 +1,12 @@
+{
+  "name": "family-rhythm",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "reminders": "node scripts/send-reminders.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "web-push": "^3.6.7"
+  }
+}
