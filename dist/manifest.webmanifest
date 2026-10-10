@@ -1,0 +1,12 @@
+{
+  "name": "Family Rhythm",
+  "short_name": "Our Rhythm",
+  "description": "A gentle family tracker for weigh-ins, food, chores, and photo rewards.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f6f1e7",
+  "theme_color": "#56735c",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

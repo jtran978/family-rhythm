@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#f6f1e7" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Family Rhythm" />
+  <title>Family Rhythm</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="./icon.svg" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow" id="todayLabel"></p>
+        <h1>Family Rhythm</h1>
+      </div>
+      <div class="avatar" aria-hidden="true">♡</div>
+    </header>
+
+    <section id="home" class="view active" aria-labelledby="home-title">
+      <div class="hero-card">
+        <div>
+          <p class="eyebrow">A gentle check-in</p>
+          <h2 id="home-title">Today, together.</h2>
+          <p id="weighStatus" class="muted"></p>
+        </div>
+        <button id="openWeighIn" class="primary">Log weigh-in</button>
+      </div>
+
+      <div class="section-heading">
+        <h2>Today</h2>
+        <span id="todayProgress" class="pill"></span>
+      </div>
+      <div class="summary-grid">
+        <button class="summary-card rose" data-go="food">
+          <span class="summary-icon">◌</span>
+          <strong id="mealCount">0 meals</strong>
+          <small>Food journal</small>
+        </button>
+        <button class="summary-card sage" data-go="chores">
+          <span class="summary-icon">✓</span>
+          <strong id="choreSummary">0 of 0</strong>
+          <small>Chores complete</small>
+        </button>
+      </div>
+
+      <div class="section-heading"><h2>Recent weigh-ins</h2><button class="text-button" data-go="weighins">See all</button></div>
+      <div id="recentWeights" class="stack"></div>
+    </section>
+
+    <section id="weighins" class="view" aria-labelledby="weigh-title">
+      <div class="page-heading"><p class="eyebrow">Monday + Friday</p><h2 id="weigh-title">Weigh-ins</h2><p>Showing up earns the reward. The number never does.</p></div>
+      <button id="openWeighInLarge" class="primary full">Add today’s weigh-in</button>
+      <div id="weightHistory" class="stack roomy"></div>
+    </section>
+
+    <section id="food" class="view" aria-labelledby="food-title">
+      <div class="page-heading"><p class="eyebrow">No counting required</p><h2 id="food-title">Food journal</h2><p>Keep a simple, kind record of meals and snacks.</p></div>
+      <form id="foodForm" class="entry-form">
+        <label>What did you have?<input id="foodName" required maxlength="80" placeholder="Breakfast, soup, a snack…" /></label>
+        <label>Optional note<textarea id="foodNote" maxlength="180" placeholder="How it felt, who you ate with…"></textarea></label>
+        <button class="primary" type="submit">Add to today</button>
+      </form>
+      <div id="foodList" class="stack roomy"></div>
+    </section>
+
+    <section id="chores" class="view" aria-labelledby="chores-title">
+      <div class="page-heading"><p class="eyebrow">Small wins count</p><h2 id="chores-title">Chores</h2><p>A shared view of what needs a little love.</p></div>
+      <form id="choreForm" class="inline-form">
+        <input id="choreName" required maxlength="80" placeholder="Add a chore" aria-label="Chore name" />
+        <button class="primary" type="submit">Add</button>
+      </form>
+      <div id="choreList" class="stack roomy"></div>
+    </section>
+
+    <section id="photos" class="view" aria-labelledby="photos-title">
+      <div class="page-heading"><p class="eyebrow">The good stuff</p><h2 id="photos-title">Photo rewards</h2><p>Add favorite family pictures. One is revealed after each Monday or Friday weigh-in.</p></div>
+      <label class="upload-card">
+        <span>＋</span><strong>Add family photos</strong><small>Choose several at once</small>
+        <input id="photoInput" type="file" accept="image/*" multiple hidden />
+      </label>
+      <p class="privacy-note">Photos stay in this browser on this device.</p>
+      <div id="photoGrid" class="photo-grid"></div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Main navigation">
+    <button data-view="home" class="active"><span>⌂</span>Today</button>
+    <button data-view="weighins"><span>◒</span>Weigh-ins</button>
+    <button data-view="food"><span>◌</span>Food</button>
+    <button data-view="chores"><span>✓</span>Chores</button>
+    <button data-view="photos"><span>▧</span>Photos</button>
+  </nav>
+
+  <dialog id="weighDialog">
+    <form id="weighForm" method="dialog" class="dialog-card">
+      <button class="dialog-close" value="cancel" aria-label="Close">×</button>
+      <p class="eyebrow">A moment for you</p>
+      <h2>Monday & Friday check-in</h2>
+      <p class="muted">The reward is for checking in—not for any particular number.</p>
+      <label>Weight<div class="weight-field"><input id="weightValue" type="number" required min="1" max="1000" step="0.1" inputmode="decimal" /><select id="weightUnit"><option>lb</option><option>kg</option></select></div></label>
+      <button type="submit" class="primary full">Save & reveal a photo</button>
+    </form>
+  </dialog>
+
+  <div id="reward" class="reward" hidden>
+    <div class="reward-card">
+      <p class="eyebrow">You showed up ♡</p>
+      <h2>Here’s a little joy.</h2>
+      <img id="rewardImage" alt="A family photo reward" />
+      <div id="rewardEmpty" hidden><div class="empty-heart">♡</div><p>Add family photos to make the next check-in extra sweet.</p></div>
+      <button id="closeReward" class="primary full">Done</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="./app.js"></script>
+  <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js');</script>
+</body>
+</html>
