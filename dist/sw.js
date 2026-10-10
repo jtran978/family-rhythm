@@ -1,4 +1,4 @@
-const CACHE = 'family-rhythm-v12';
+const CACHE = 'family-rhythm-v13';
 const SHELL = ['./', './index.html', './styles.css', './app.js', './config.js', './manifest.webmanifest', './icon.svg', './icon-180.png', './icon-512.png'];
 
 self.addEventListener('install', event => {
@@ -18,8 +18,10 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
+  // Always ask the server for the newest copy (skips the browser's 10-minute cache);
+  // fall back to the saved copy when offline.
   event.respondWith(
-    fetch(event.request)
+    fetch(new Request(url.href, { cache: 'no-cache', credentials: 'same-origin' }))
       .then(response => {
         const copy = response.clone();
         caches.open(CACHE).then(cache => cache.put(event.request, copy));
