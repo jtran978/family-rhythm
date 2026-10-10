@@ -109,3 +109,14 @@ dialog.sheet{max-width:640px;width:calc(100% - 20px);max-height:calc(100dvh - 30
 /* ---- Yuffie ---- */
 .yuffie-mark{display:block;width:84px;height:84px;border-radius:24px;margin-bottom:16px;box-shadow:0 8px 20px rgba(39,43,37,.18)}
 .yuffie-mark.large{width:132px;height:132px;border-radius:34px;margin:4px auto 16px}
+
+/* ---- profile photos ---- */
+.face-img{display:block;width:64px;height:64px;border-radius:50%;object-fit:cover}
+.avatar .face-img{width:44px;height:44px}
+.avatar{overflow:hidden;padding:0}
+.photo-pick{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.face-preview{width:60px;height:60px;border-radius:50%;background:#f1ece2;display:grid;place-items:center;font-size:30px;overflow:hidden;flex:none}
+.face-preview .face-img{width:60px;height:60px}
+.photo-pick-btn{display:inline-block;cursor:pointer;padding:10px 14px;font-size:14px}
+.profile-list.editing .profile-btn:not(.add){outline:2px dashed var(--sage);outline-offset:-6px}
+.profile-list.editing .profile-btn.add{display:none}

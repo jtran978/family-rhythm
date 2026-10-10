@@ -42,19 +42,29 @@
   <section id="pickerGate" class="gate">
     <div class="gate-card">
       <p class="eyebrow">Hello again</p>
-      <h2>Who’s checking in?</h2>
+      <h2 id="pickerTitle">Who’s checking in?</h2>
       <div id="profileList" class="profile-list"></div>
       <form id="profileForm" class="entry-form flat" hidden>
+        <p id="profileFormTitle" class="field-label">Add a person</p>
         <label>Name<input id="profileName" maxlength="40" required placeholder="First name" /></label>
         <div>
-          <span class="field-label">Pick a face</span>
+          <span class="field-label">Photo</span>
+          <div class="photo-pick">
+            <span id="profilePhotoPreview" class="face-preview"></span>
+            <label class="ghost photo-pick-btn"><span id="profilePhotoLabel">Choose a photo</span><input id="profilePhotoInput" type="file" accept="image/*" hidden /></label>
+            <button type="button" id="removeProfilePhoto" class="text-button" hidden>Remove</button>
+          </div>
+        </div>
+        <div>
+          <span class="field-label" id="faceLabel">Or pick a face</span>
           <div id="emojiRow" class="emoji-row"></div>
         </div>
         <div class="inline-form">
           <button type="button" id="cancelProfile" class="ghost">Cancel</button>
-          <button type="submit" class="primary grow">Add</button>
+          <button type="submit" class="primary grow" id="saveProfile">Add</button>
         </div>
       </form>
+      <button id="editPeople" class="text-button center">Edit people</button>
       <button id="signOut" class="text-button center">Sign out of this phone</button>
     </div>
   </section>

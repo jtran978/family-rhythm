@@ -85,10 +85,16 @@ $('#signOut').onclick = async () => {
 };
 
 // ---------- profiles ----------
+// A profile shows its own photo if it has one (private "avatars" bucket, no PIN needed), else its emoji.
+let avatarUrls = {};
+let editingPeople = false;
+
 async function loadProfiles(autoEnter) {
   const { data: rows, error } = await sb.from('profiles').select('*').order('created_at');
   if (oops(error, 'Couldn’t load profiles')) return showGate('picker');
   profiles = rows;
+  await loadAvatars();
+  if (me) { me = profiles.find(p => p.id === me.id) || me; $('#avatarFace').innerHTML = faceHTML(me); }
   renderPicker();
   const remembered = profiles.find(p => p.id === store.get('fr-profile'));
   if (autoEnter && remembered) return enterApp(remembered);
@@ -96,44 +102,134 @@ async function loadProfiles(autoEnter) {
   if (!profiles.length) openProfileForm();
 }
 
+async function loadAvatars() {
+  const withPhoto = profiles.filter(p => p.avatar_path);
+  avatarUrls = {};
+  if (!withPhoto.length) return;
+  const { data: signed, error } = await sb.storage.from('avatars').createSignedUrls(withPhoto.map(p => p.avatar_path), 60 * 60 * 24 * 7);
+  if (error) return console.error(error);
+  for (const sgn of signed || []) {
+    const p = withPhoto.find(x => x.avatar_path === sgn.path);
+    if (p && sgn.signedUrl) avatarUrls[p.id] = sgn.signedUrl;
+  }
+}
+
+const faceHTML = p => avatarUrls[p.id] ? `<img class="face-img" src="${escAttr(avatarUrls[p.id])}" alt="" />` : esc(p.emoji);
+
 function renderPicker() {
+  $('#profileList').classList.toggle('editing', editingPeople);
+  $('#pickerTitle').textContent = editingPeople ? 'Tap someone to edit' : 'Who’s checking in?';
+  $('#editPeople').textContent = editingPeople ? 'Done editing' : 'Edit people';
+  $('#editPeople').hidden = !profiles.length;
   $('#profileList').innerHTML = profiles.map(p =>
-    `<button class="profile-btn" data-profile="${p.id}"><span class="face">${esc(p.emoji)}</span>${esc(p.name)}</button>`
+    `<button class="profile-btn" data-profile="${p.id}"><span class="face">${faceHTML(p)}</span>${esc(p.name)}</button>`
   ).join('') + `<button class="profile-btn add" id="addProfile"><span class="face">＋</span>Add person</button>`;
-  $$('[data-profile]').forEach(b => b.onclick = () => enterApp(profiles.find(p => p.id === b.dataset.profile)));
-  $('#addProfile').onclick = openProfileForm;
+  $$('[data-profile]').forEach(b => b.onclick = () => {
+    const p = profiles.find(x => x.id === b.dataset.profile);
+    editingPeople ? openProfileForm(p) : enterApp(p);
+  });
+  $('#addProfile').onclick = () => openProfileForm();
+}
+$('#editPeople').onclick = () => { editingPeople = !editingPeople; $('#profileForm').hidden = true; renderPicker(); };
+
+// Center-crop to a square and shrink, so profile photos are small and load fast.
+async function squarePhoto(file, size = 320) {
+  const bmp = await createImageBitmap(file);
+  const side = Math.min(bmp.width, bmp.height);
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  canvas.getContext('2d').drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, size, size);
+  return new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.86));
 }
 
 let chosenFace = FACES[0];
-function openProfileForm() {
-  chosenFace = FACES[profiles.length % FACES.length];
-  $('#emojiRow').innerHTML = FACES.map(f => `<button type="button" data-face="${f}" class="${f === chosenFace ? 'selected' : ''}">${f}</button>`).join('');
+let editingProfile = null;   // null when adding someone new
+let pendingPhoto = null;     // { blob, url } chosen but not saved yet
+let removePhoto = false;
+
+function renderFacePreview() {
+  const url = pendingPhoto?.url || (!removePhoto && editingProfile && avatarUrls[editingProfile.id]);
+  $('#profilePhotoPreview').innerHTML = url ? `<img class="face-img" src="${escAttr(url)}" alt="" />` : esc(chosenFace);
+  $('#removeProfilePhoto').hidden = !url;
+  $('#profilePhotoLabel').textContent = url ? 'Change photo' : 'Choose a photo';
+  $('#faceLabel').textContent = url ? 'Face (used if the photo is removed)' : 'Or pick a face';
+}
+
+function openProfileForm(profile = null) {
+  editingProfile = profile;
+  if (pendingPhoto) URL.revokeObjectURL(pendingPhoto.url);
+  pendingPhoto = null; removePhoto = false;
+  chosenFace = profile?.emoji || FACES[profiles.length % FACES.length];
+  $('#profileFormTitle').textContent = profile ? `Edit ${profile.name}` : 'Add a person';
+  $('#saveProfile').textContent = profile ? 'Save' : 'Add';
+  $('#profileName').value = profile?.name || '';
+  const faces = FACES.includes(chosenFace) ? FACES : [chosenFace, ...FACES];
+  $('#emojiRow').innerHTML = faces.map(f => `<button type="button" data-face="${f}" class="${f === chosenFace ? 'selected' : ''}">${f}</button>`).join('');
   $$('[data-face]').forEach(b => b.onclick = () => {
     chosenFace = b.dataset.face;
     $$('[data-face]').forEach(x => x.classList.toggle('selected', x === b));
+    renderFacePreview();
   });
+  renderFacePreview();
   $('#profileForm').hidden = false;
   $('#cancelProfile').hidden = !profiles.length;
   $('#profileName').focus();
 }
 $('#cancelProfile').onclick = () => { $('#profileForm').hidden = true; };
+
+$('#profilePhotoInput').onchange = async e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    const blob = await squarePhoto(file);
+    if (pendingPhoto) URL.revokeObjectURL(pendingPhoto.url);
+    pendingPhoto = { blob, url: URL.createObjectURL(blob) };
+    removePhoto = false;
+    renderFacePreview();
+  } catch (err) { console.error(err); toast('Couldn’t read that photo'); }
+};
+$('#removeProfilePhoto').onclick = () => {
+  if (pendingPhoto) { URL.revokeObjectURL(pendingPhoto.url); pendingPhoto = null; }
+  removePhoto = true;
+  renderFacePreview();
+};
+
 $('#profileForm').onsubmit = async e => {
   e.preventDefault();
-  const { error } = await sb.from('profiles').insert({ name: $('#profileName').value.trim(), emoji: chosenFace });
-  if (oops(error, 'Couldn’t add that person')) return;
-  e.target.reset();
+  const fields = { name: $('#profileName').value.trim(), emoji: chosenFace };
+  const { data: saved, error } = editingProfile
+    ? await sb.from('profiles').update(fields).eq('id', editingProfile.id).select().single()
+    : await sb.from('profiles').insert(fields).select().single();
+  if (oops(error, editingProfile ? 'Couldn’t save that person' : 'Couldn’t add that person')) return;
+
+  const oldPath = saved.avatar_path;
+  let avatar_path = oldPath;
+  if (pendingPhoto) {
+    const path = `${session.user.id}/${saved.id}-${crypto.randomUUID().slice(0, 8)}.jpg`;
+    const { error: upErr } = await sb.storage.from('avatars').upload(path, pendingPhoto.blob, { contentType: 'image/jpeg' });
+    if (oops(upErr, 'Saved, but the photo didn’t upload. Try again?')) return loadProfiles(false);
+    avatar_path = path;
+  } else if (removePhoto) avatar_path = null;
+
+  if (avatar_path !== oldPath) {
+    const { error: e2 } = await sb.from('profiles').update({ avatar_path }).eq('id', saved.id);
+    if (!oops(e2, 'Couldn’t save the photo') && oldPath) await sb.storage.from('avatars').remove([oldPath]);
+  }
+  if (pendingPhoto) { URL.revokeObjectURL(pendingPhoto.url); pendingPhoto = null; }
   $('#profileForm').hidden = true;
+  toast(editingProfile ? 'Saved' : `${fields.name} added`);
   await loadProfiles(false);
 };
 
-$('#switchProfile').onclick = () => { renderPicker(); $('#profileForm').hidden = true; showGate('picker'); };
+$('#switchProfile').onclick = () => { editingPeople = false; renderPicker(); $('#profileForm').hidden = true; showGate('picker'); };
 
 async function enterApp(profile) {
   me = profile;
   data.weights = [];
   render();
   store.set('fr-profile', me.id);
-  $('#avatarFace').textContent = me.emoji;
+  $('#avatarFace').innerHTML = faceHTML(me);
   $('#helloName').textContent = me.name;
   $('#weightUnit').value = store.get(`fr-unit-${me.id}`) || 'lb';
   showGate(null);
