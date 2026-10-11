@@ -6,7 +6,7 @@ A gentle household app: Monday and Friday weigh-ins with photo rewards, a shared
 - Weigh-ins and sweet treats are per profile; chores, errands, bills, recipes and photos are shared
 - Data in Supabase Postgres, photos in a private Supabase Storage bucket
 - Hosted on GitHub Pages from `dist/`
-- Reminders via Web Push, sent hourly by GitHub Actions (`.github/workflows/reminders.yml`), which also keeps the free Supabase project from pausing
+- Reminders via Web Push, sent hourly by GitHub Actions (`.github/workflows/reminders.yml`), started on time each hour by Supabase's scheduler, which also keeps the free Supabase project from pausing
 
 ## Layout
 
@@ -45,3 +45,7 @@ Forgot the PIN? In Supabase SQL Editor run `update public.photo_lock set pin_has
 Change the weigh-in hours at the top of `scripts/send-reminders.mjs`. GitHub runs the sender once an hour, a few minutes past, and sometimes late, so reminders land within the hour, not to the minute. Run the workflow manually with `force` set to `weigh`, `chores` or `bills` to send a test.
 
 On iPhone, reminders only work after the app is added to the Home Screen (iOS 16.4+) and turned on from the Today screen.
+
+## Reminder schedule setup
+
+Supabase's scheduler (pg_cron) starts the Reminders workflow at 2 minutes past every hour, using a fine-grained GitHub token (Actions: read and write on this repo only) stored in Supabase Vault. See `supabase/migrations/011_reliable_reminder_schedule.sql`. When the token expires, make a new one and run that file again with it.

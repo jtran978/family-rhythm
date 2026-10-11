@@ -1,8 +1,9 @@
 name: Reminders
 
+# Started at 2 minutes past every hour by Supabase's scheduler (pg_cron), see
+# supabase/migrations/011_reliable_reminder_schedule.sql. GitHub's own schedule
+# skipped too many hours to rely on. The script decides what to send based on New York time.
 on:
-  schedule:
-    - cron: '7 * * * *'   # hourly; the script decides what to send based on New York time
   workflow_dispatch:
     inputs:
       force:
@@ -12,7 +13,6 @@ on:
 
 permissions:
   contents: read
-  actions: write
 
 jobs:
   remind:
@@ -32,10 +32,3 @@ jobs:
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
           REMINDER_FORCE: ${{ inputs.force }}
-      # GitHub turns off scheduled workflows after 60 days without repo activity.
-      # Re-enabling it on every run keeps the hourly schedule alive.
-      - name: Keep the schedule alive
-        if: always()
-        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/reminders.yml/enable"
-        env:
-          GH_TOKEN: ${{ github.token }}
