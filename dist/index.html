@@ -147,6 +147,11 @@
       <form id="choreForm" class="entry-form">
         <label>Chore<input id="choreName" required maxlength="80" placeholder="Take out the trash" /></label>
         <label>Remind at<select id="choreRemind" class="time-select"></select></label>
+        <div class="photo-pick">
+          <span id="chorePhotoPreview" class="chore-photo-preview" hidden></span>
+          <label class="ghost photo-pick-btn">📷 <span id="chorePhotoLabel">Add photo</span><input id="chorePhotoInput" type="file" accept="image/*" hidden /></label>
+          <button type="button" id="removeChorePhoto" class="text-button" hidden>Remove</button>
+        </div>
         <button class="primary" type="submit">Add chore</button>
       </form>
       <div id="choreList" class="stack roomy"></div>
@@ -344,6 +349,18 @@
       <button id="saveTreat" class="text-button center">Save it for later</button>
     </div>
   </div>
+
+  <div id="choreViewer" class="reward" hidden>
+    <div class="reward-card">
+      <p class="eyebrow">Chore photo</p>
+      <h2 id="choreViewerTitle"></h2>
+      <img id="choreViewerImage" alt="" />
+      <label class="ghost full photo-pick-btn viewer-btn">📷 Replace photo<input id="choreReplaceInput" type="file" accept="image/*" hidden /></label>
+      <button id="choreRemovePhoto" class="text-button center danger-text">Remove photo</button>
+      <button id="closeChoreViewer" class="primary full">Done</button>
+    </div>
+  </div>
+  <input id="choreAttachInput" type="file" accept="image/*" hidden />
 
   <div id="reward" class="reward" hidden>
     <div class="reward-card">

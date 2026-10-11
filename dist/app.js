@@ -20,6 +20,7 @@ const DEFAULT_CHORE_HOUR = 18;
 let session = null;
 let profiles = [];
 let me = null;
+let chorePhotoUrls = {};
 const data = { weights: [], chores: [], errands: [], treatMenu: [], redemptions: [], bills: [], payments: [], recipes: [], photos: [] };
 
 // ---------- helpers ----------
@@ -266,6 +267,7 @@ async function refresh() {
   data.weights = w.data; data.chores = c.data; data.bills = b.data; data.payments = p.data; data.recipes = r.data;
   data.errands = e.data; data.treatMenu = tm.data; data.redemptions = tr.data;
   data.loaded = true;
+  await signChorePhotos();
   render();
 }
 
@@ -361,7 +363,11 @@ function renderWeights() {
 function renderChores() {
   $('#choreList').innerHTML = data.chores.map(x => {
     const who = x.done && profileName(x.done_by);
-    return `<div class="list-card"><button class="check ${x.done ? 'done' : ''}" data-toggle-chore="${x.id}" aria-label="Mark complete">${x.done ? '✓' : ''}</button><div class="grow ${x.done ? 'completed' : ''}"><strong>${esc(x.name)}</strong><small>${x.done ? (who ? `Done by ${esc(who)}` : 'Complete') : 'Ready when you are'}</small></div><select class="time-select compact" data-chore-time="${x.id}" aria-label="Reminder time for ${escAttr(x.name)}">${hourOptions(x.remind_hour)}</select><button class="delete" data-delete-chore="${x.id}" aria-label="Delete chore">×</button></div>`;
+    const photo = x.photo_path && chorePhotoUrls[x.photo_path];
+    const pic = photo
+      ? `<button class="chore-thumb" data-view-chore-photo="${x.id}" aria-label="See photo for ${escAttr(x.name)}"><img src="${escAttr(photo)}" alt="" /></button>`
+      : `<button class="chore-cam" data-attach-chore="${x.id}" aria-label="Add a photo to ${escAttr(x.name)}">📷</button>`;
+    return `<div class="list-card chore-card"><button class="check ${x.done ? 'done' : ''}" data-toggle-chore="${x.id}" aria-label="Mark complete">${x.done ? '✓' : ''}</button>${photo ? pic : ''}<div class="grow ${x.done ? 'completed' : ''}"><strong>${esc(x.name)}</strong><small>${x.done ? (who ? `Done by ${esc(who)}` : 'Complete') : 'Ready when you are'}</small></div>${photo ? '' : pic}<select class="time-select compact" data-chore-time="${x.id}" aria-label="Reminder time for ${escAttr(x.name)}">${hourOptions(x.remind_hour)}</select><button class="delete" data-delete-chore="${x.id}" aria-label="Delete chore">×</button></div>`;
   }).join('') || '<div class="empty">Your chore list is clear.</div>';
   $$('[data-chore-time]').forEach(s => s.onchange = async () => {
     const remind_hour = s.value === '' ? null : Number(s.value);
@@ -378,10 +384,98 @@ function renderChores() {
     if (!oops(error)) { if (done) { toast('Nice. One less thing.'); showReward('chore', chore.id); } refresh(); }
   });
   $$('[data-delete-chore]').forEach(b => b.onclick = async () => {
-    const { error } = await sb.from('chores').delete().eq('id', b.dataset.deleteChore);
-    if (!oops(error)) refresh();
+    const chore = data.chores.find(x => x.id === b.dataset.deleteChore);
+    const { error } = await sb.from('chores').delete().eq('id', chore.id);
+    if (oops(error)) return;
+    if (chore.photo_path) await sb.storage.from('chore-photos').remove([chore.photo_path]);
+    refresh();
   });
+  $$('[data-view-chore-photo]').forEach(b => b.onclick = () => openChoreViewer(b.dataset.viewChorePhoto));
+  $$('[data-attach-chore]').forEach(b => b.onclick = () => { attachTo = b.dataset.attachChore; $('#choreAttachInput').click(); });
 }
+
+// ---------- chore photos (private "chore-photos" bucket, no PIN needed) ----------
+async function signChorePhotos() {
+  const paths = data.chores.map(x => x.photo_path).filter(p => p && !chorePhotoUrls[p]);
+  if (!paths.length) return;
+  const { data: signed, error } = await sb.storage.from('chore-photos').createSignedUrls(paths, 60 * 60 * 24);
+  if (error) return console.error(error);
+  for (const sgn of signed || []) if (sgn.signedUrl) chorePhotoUrls[sgn.path] = sgn.signedUrl;
+}
+
+async function uploadChorePhoto(choreId, file) {
+  const blob = await shrink(file, 1400);
+  const path = `${session.user.id}/${choreId}-${crypto.randomUUID().slice(0, 8)}.jpg`;
+  const { error } = await sb.storage.from('chore-photos').upload(path, blob, { contentType: 'image/jpeg' });
+  if (oops(error, 'Couldn’t upload that photo')) return null;
+  return path;
+}
+
+// Put a new photo on a chore (or remove it with file = null), cleaning up the old file.
+async function setChorePhoto(choreId, file) {
+  const oldPath = data.chores.find(x => x.id === choreId)?.photo_path || null;
+  const path = file ? await uploadChorePhoto(choreId, file) : null;
+  if (file && !path) return false;
+  const { error } = await sb.from('chores').update({ photo_path: path }).eq('id', choreId);
+  if (oops(error, 'Couldn’t save that photo')) return false;
+  if (oldPath && oldPath !== path) await sb.storage.from('chore-photos').remove([oldPath]);
+  await refresh();
+  return true;
+}
+
+let attachTo = null;
+$('#choreAttachInput').onchange = async e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file || !attachTo) return;
+  toast('Adding photo…');
+  if (await setChorePhoto(attachTo, file)) toast('Photo added');
+  attachTo = null;
+};
+
+let viewingChore = null;
+function openChoreViewer(choreId) {
+  const chore = data.chores.find(x => x.id === choreId);
+  if (!chore?.photo_path) return;
+  viewingChore = choreId;
+  $('#choreViewerTitle').textContent = chore.name;
+  $('#choreViewerImage').src = chorePhotoUrls[chore.photo_path] || '';
+  $('#choreViewer').hidden = false;
+}
+$('#closeChoreViewer').onclick = () => { $('#choreViewer').hidden = true; };
+$('#choreReplaceInput').onchange = async e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file || !viewingChore) return;
+  toast('Replacing photo…');
+  if (await setChorePhoto(viewingChore, file)) { toast('Photo replaced'); openChoreViewer(viewingChore); }
+};
+$('#choreRemovePhoto').onclick = async () => {
+  if (!viewingChore || !confirm('Remove this photo?')) return;
+  if (await setChorePhoto(viewingChore, null)) { $('#choreViewer').hidden = true; toast('Photo removed'); }
+};
+
+// Photo picked while adding a new chore
+let newChorePhoto = null;
+function renderNewChorePhoto() {
+  $('#chorePhotoPreview').hidden = !newChorePhoto;
+  $('#chorePhotoPreview').innerHTML = newChorePhoto ? `<img src="${escAttr(newChorePhoto.url)}" alt="" />` : '';
+  $('#removeChorePhoto').hidden = !newChorePhoto;
+  $('#chorePhotoLabel').textContent = newChorePhoto ? 'Change photo' : 'Add photo';
+}
+$('#chorePhotoInput').onchange = e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  if (newChorePhoto) URL.revokeObjectURL(newChorePhoto.url);
+  newChorePhoto = { file, url: URL.createObjectURL(file) };
+  renderNewChorePhoto();
+};
+$('#removeChorePhoto').onclick = () => {
+  if (newChorePhoto) URL.revokeObjectURL(newChorePhoto.url);
+  newChorePhoto = null;
+  renderNewChorePhoto();
+};
 
 // ---------- annoying errands + sweet treats ----------
 // Errands are shared. Each finished errand counts for whoever did it; every 5 unlock a sweet treat.
@@ -805,9 +899,18 @@ $('#choreRemind').innerHTML = hourOptions(DEFAULT_CHORE_HOUR);
 $('#choreForm').onsubmit = async e => {
   e.preventDefault();
   const r = $('#choreRemind').value;
-  const { error } = await sb.from('chores').insert({ name: $('#choreName').value.trim(), remind_hour: r === '' ? null : Number(r) });
+  const { data: chore, error } = await sb.from('chores').insert({ name: $('#choreName').value.trim(), remind_hour: r === '' ? null : Number(r) }).select().single();
   if (oops(error, 'Couldn’t add that chore')) return;
-  $('#choreName').value = ''; toast('Chore added'); refresh();
+  $('#choreName').value = '';
+  if (newChorePhoto) {
+    toast('Adding photo…');
+    const path = await uploadChorePhoto(chore.id, newChorePhoto.file);
+    if (path) await sb.from('chores').update({ photo_path: path }).eq('id', chore.id);
+    URL.revokeObjectURL(newChorePhoto.url);
+    newChorePhoto = null;
+    renderNewChorePhoto();
+  }
+  toast('Chore added'); refresh();
 };
 
 const openWeigh = () => { $('#weightValue').value = ''; $('#weighDialog').showModal(); setTimeout(() => $('#weightValue').focus(), 100); };
