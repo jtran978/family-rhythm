@@ -348,6 +348,17 @@
     </form>
   </dialog>
 
+  <dialog id="chooseDialog" class="sheet">
+    <div class="dialog-card">
+      <button type="button" class="dialog-close" id="closeChoose" aria-label="Close">×</button>
+      <p class="eyebrow">Dinner for</p>
+      <h2 id="chooseTitle">Pick a dinner</h2>
+      <button type="button" class="ghost full surprise-btn" id="chooseRandom">🔀 Surprise me</button>
+      <input id="chooseSearch" class="search" type="search" placeholder="Search recipes" aria-label="Search recipes" autocomplete="off" />
+      <div id="chooseList" class="stack choose-list"></div>
+    </div>
+  </dialog>
+
   <dialog id="recipeDialog" class="sheet">
     <div class="dialog-card">
       <button type="button" class="dialog-close" id="closeRecipe" aria-label="Close">×</button>

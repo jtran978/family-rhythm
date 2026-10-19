@@ -223,3 +223,9 @@ body.no-weigh .summary-grid .summary-card.plain{grid-column:1/-1;min-height:auto
 .grocery-row.got .box::after{content:"✓"}
 .grocery-add{margin-top:12px}
 .rotation-row{margin:12px 0 2px}
+
+/* ---- choose a dinner ---- */
+.night-btn.wide{width:auto;padding:0 11px;font-size:13px;font-weight:800;color:var(--sage)}
+.surprise-btn{margin:10px 0 2px;color:var(--sage);font-weight:800}
+.choose-list{margin-top:14px}
+.recipe-card.chosen{border-color:var(--sage);background:var(--sage-soft)}

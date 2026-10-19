@@ -970,13 +970,12 @@ function renderPlan() {
       const cls = `night${d < today ? ' past' : ''}`;
       if (!r) return `<div class="${cls}">${label}<button class="night-pick" data-pick-night="${d}">＋ Pick a dinner</button></div>`;
       return `<div class="${cls}">${label}<button class="night-recipe" data-open-plan="${r.id}"><strong>${esc(r.title)}</strong>${r.total_minutes ? `<small>${minutesLabel(r.total_minutes)}</small>` : ''}</button>`
-        + `<button class="night-btn" data-swap-night="${d}" aria-label="Swap ${escAttr(r.title)} for another recipe" title="Swap">↻</button>`
+        + `<button class="night-btn wide" data-pick-night="${d}" aria-label="Change dinner on ${DAY_SHORT[P.weekday(d)]}">Change</button>`
         + `<button class="night-btn" data-clear-night="${d}" aria-label="No dinner on ${DAY_SHORT[P.weekday(d)]}" title="Remove">×</button></div>`;
     }).join('') || '<div class="empty">No dinner nights chosen. Pick some below.</div>';
   }
   $$('[data-open-plan]').forEach(b => b.onclick = () => openRecipe(recipeById(b.dataset.openPlan)));
-  $$('[data-pick-night]').forEach(b => b.onclick = () => fillNights([b.dataset.pickNight]));
-  $$('[data-swap-night]').forEach(b => b.onclick = () => fillNights([b.dataset.swapNight], true));
+  $$('[data-pick-night]').forEach(b => b.onclick = () => openChooser(b.dataset.pickNight));
   $$('[data-clear-night]').forEach(b => b.onclick = async () => {
     const { error } = await sb.from('meal_plan').delete().eq('day', b.dataset.clearNight);
     if (!oops(error, 'Couldn’t change the plan')) loadPlan();
@@ -1001,6 +1000,58 @@ async function fillNights(dayKeys, swapping = false) {
   await loadPlan();
   toast(swapping ? `How about ${picks[0].title}?` : dayKeys.length > 1 ? 'Dinners picked. Grocery list updated.' : `${picks[0].title} it is`);
 }
+
+// Choose a specific recipe for a night, or let it pick one at random ("Surprise me").
+let choosingDay = null;
+function openChooser(day) {
+  if (!data.recipes.length) return toast('Save a recipe first');
+  choosingDay = day;
+  const filled = data.plan.some(p => p.day === day);
+  $('#chooseTitle').textContent = new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+  $('#chooseRandom').textContent = filled ? '🔀 Surprise me with something else' : '🔀 Surprise me';
+  $('#chooseRandom').hidden = !P.dinnerPool(data.recipes).length;
+  $('#chooseSearch').value = '';
+  renderChooser();
+  $('#chooseDialog').showModal();
+  $('#chooseDialog').scrollTop = 0;
+}
+
+function renderChooser() {
+  const q = $('#chooseSearch').value.trim().toLowerCase();
+  const current = data.plan.find(p => p.day === choosingDay)?.recipe_id;
+  const otherNights = id => data.plan.filter(p => p.recipe_id === id && p.day !== choosingDay).map(p => DAY_SHORT[P.weekday(p.day)]);
+  const shown = data.recipes
+    .filter(r => !q || r.title.toLowerCase().includes(q) || r.ingredients.some(i => i.toLowerCase().includes(q)))
+    .sort((a, b) => (b.id === current) - (a.id === current) || a.title.localeCompare(b.title));
+  $('#chooseList').innerHTML = shown.map(r => {
+    const img = r.image_url && safeUrl(r.image_url);
+    const also = otherNights(r.id);
+    const meta = [minutesLabel(r.total_minutes), also.length && `Also on ${also.join(', ')}`,
+      r.in_rotation === false && 'Not in the shuffle', !r.ingredients.length && 'No ingredients yet'].filter(Boolean).join(' · ');
+    return `<button class="list-card recipe-card${r.id === current ? ' chosen' : ''}" data-choose="${r.id}">${img
+      ? `<img class="recipe-thumb" src="${escAttr(img)}" alt="" loading="lazy" referrerpolicy="no-referrer" />`
+      : '<span class="recipe-thumb">❦</span>'}<div class="grow"><strong>${esc(r.title)}</strong>${meta ? `<small>${esc(meta)}</small>` : ''}</div>${r.id === current ? '<span class="pill">Picked</span>' : ''}</button>`;
+  }).join('') || '<div class="empty">No recipes match that.</div>';
+  $$('[data-choose]').forEach(b => b.onclick = () => chooseDinner(b.dataset.choose));
+}
+$('#chooseSearch').oninput = renderChooser;
+$('#closeChoose').onclick = () => $('#chooseDialog').close();
+
+async function chooseDinner(recipeId) {
+  const day = choosingDay, r = recipeById(recipeId);
+  $('#chooseDialog').close();
+  if (data.plan.find(p => p.day === day)?.recipe_id === recipeId) return;
+  const { error } = await sb.from('meal_plan').upsert({ owner: session.user.id, day, recipe_id: recipeId }, { onConflict: 'owner,day' });
+  if (oops(error, 'Couldn’t save the dinner plan')) return;
+  await loadPlan();
+  toast(`${r.title} on ${new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long' })}`);
+}
+
+$('#chooseRandom').onclick = () => {
+  const day = choosingDay;
+  $('#chooseDialog').close();
+  fillNights([day], data.plan.some(p => p.day === day));
+};
 
 // Shuffle re-picks tonight and the rest of the week (past nights stay as they were).
 $('#shufflePlan').onclick = () => {
