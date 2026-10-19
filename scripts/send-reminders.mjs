@@ -4,19 +4,24 @@
 
 import { createClient } from '@supabase/supabase-js';
 import webpush from 'web-push';
+import '../dist/planner.js';  // the same dinner picks and grocery list as the app
+const P = globalThis.CasaPlanner;
 
 const TZ = 'America/New_York';
 const WEIGH_DAYS = ['Mon', 'Fri'];
 const WEIGH_IN_HOUR = 8;         // morning reminder on weigh-in days
 const WEIGH_IN_NUDGE_HOUR = 19;  // evening nudge if still not logged
 const CATCH_UP_HOURS = 2;  // GitHub sometimes runs late or skips an hour
-// Each chore and bill sets its own reminder hour in the app.
+// Each chore, bill and family reminder sets its own reminder hour in the app.
+// Sunday's dinner pick runs at the hour set on the Recipes tab (default 9am).
+const DEFAULT_DINNER_DAYS = [0, 1, 2, 3, 4];
+const DEFAULT_PLAN_HOUR = 9;
 
 const {
   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
   VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY,
   VAPID_SUBJECT = 'mailto:family-rhythm@example.com',
-  REMINDER_FORCE = ''           // 'weigh', 'chores' or 'bills' to send a test right now
+  REMINDER_FORCE = ''           // 'weigh', 'chores', 'bills', 'family' or 'dinners' to send a test right now
 } = process.env;
 
 for (const [k, v] of Object.entries({ SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY })) {
@@ -33,6 +38,8 @@ const parts = Object.fromEntries(
 const today = `${parts.year}-${parts.month}-${parts.day}`;
 const hour = Number(parts.hour);
 const weighDay = WEIGH_DAYS.includes(parts.weekday);
+const dow = P.weekday(today);   // 0 = Sunday
+const inWindow = h => h <= hour && h >= hour - CATCH_UP_HOURS;
 console.log(`Local time: ${parts.weekday} ${today} ${hour}:00 (${TZ})`);
 
 // Every run reads the database. This is the keep-awake ping.
@@ -123,6 +130,75 @@ if (subs.length) {
       await send(sub, { title: 'Bill reminder', body: `${b.name}${money(b.amount)} ${dueText(b.next_due)}.`, tag: `bill-${b.id}` });
     }
     if (!force) await db.from('bills').update({ last_reminded_for: b.next_due }).eq('id', b.id);
+  }
+}
+
+// Family reminders: weekly, on their days at their hour, once a day. For everyone, or one person.
+// A forced test sends every active family reminder.
+if (subs.length) {
+  const force = REMINDER_FORCE === 'family';
+  const { data: rems, error: famError } = await db.from('family_reminders').select('*').eq('active', true);
+  if (famError) console.error(famError);
+  const due = (rems || []).filter(r => force || (r.days.includes(dow) && inWindow(r.remind_hour) && r.last_sent_on !== today));
+  for (const r of due) {
+    for (const sub of subs.filter(s => s.owner === r.owner && (!r.profile_id || s.profile_id === r.profile_id))) {
+      await send(sub, { title: r.name, body: r.note || 'Your weekly family reminder ♡', tag: `family-${r.id}` });
+    }
+    if (!force) await db.from('family_reminders').update({ last_sent_on: today }).eq('id', r.id);
+  }
+}
+
+// Sunday dinners: pick the week's dinners at random (unless they were already picked in the app),
+// then send everyone the plan with a pointer to the grocery list. Once per Sunday per household.
+// A forced test sends the current week's plan, picking it first if it's empty.
+if (subs.length) {
+  const force = REMINDER_FORCE === 'dinners';
+  const week = P.weekStart(today);
+  const days = P.weekDays(week);
+  for (const owner of new Set(subs.map(s => s.owner))) {
+    const { data: st, error: stError } = await db.from('household_settings').select('*').eq('owner', owner).maybeSingle();
+    if (stError) { console.error(stError); continue; }
+    const dinnerDays = st?.dinner_days ?? DEFAULT_DINNER_DAYS;
+    const planHour = st?.plan_hour ?? DEFAULT_PLAN_HOUR;
+    if (!force && !(dow === 0 && inWindow(planHour) && st?.last_dinner_notice !== today)) continue;
+
+    const [{ data: recipes, error: rError }, { data: planRows, error: pError }] = await Promise.all([
+      db.from('recipes').select('id, title, ingredients, in_rotation').eq('owner', owner),
+      db.from('meal_plan').select('day, recipe_id').eq('owner', owner).gte('day', P.addDays(week, -7)).lte('day', days[6]).order('day')
+    ]);
+    if (rError || pError) { console.error(rError || pError); continue; }
+    let plan = planRows.filter(p => p.day >= week);
+    const pool = P.dinnerPool(recipes);
+
+    if (!plan.length && pool.length && dinnerDays.length) {
+      const nights = days.filter((_, i) => dinnerDays.includes(i));
+      const avoid = new Set(planRows.filter(p => p.day < week).map(p => p.recipe_id));
+      const picks = P.pickDinners(pool, nights.length, { avoid });
+      plan = nights.map((day, i) => ({ owner, day, recipe_id: picks[i].id }));
+      // ignoreDuplicates: if someone picks in the app at the same moment, their picks win.
+      const { error: insError } = await db.from('meal_plan').upsert(plan, { onConflict: 'owner,day', ignoreDuplicates: true });
+      if (insError) { console.error(insError); continue; }
+      console.log(`Picked ${plan.length} dinners for the week of ${week}`);
+    }
+
+    const byId = new Map(recipes.map(r => [r.id, r]));
+    const planned = plan.map(p => ({ ...p, recipe: byId.get(p.recipe_id) })).filter(p => p.recipe);
+    if (planned.length) {
+      const items = P.groceryList(planned.map(p => p.recipe)).filter(g => g.aisle !== 'Staples').reduce((n, g) => n + g.items.length, 0);
+      const menu = planned.map(p => `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][P.weekday(p.day)]}: ${p.recipe.title}`).join(' · ');
+      const grocery = items ? ` Your grocery list has ${items} item${items === 1 ? '' : 's'}.` : '';
+      for (const sub of subs.filter(s => s.owner === owner)) {
+        await send(sub, { title: 'This week’s dinners are picked 🍽', body: `${menu}.${grocery}`, tag: `dinners-${week}`, url: './#recipes' });
+      }
+    } else {
+      console.log('No recipes in the dinner shuffle yet, so nothing to plan');
+    }
+
+    if (!force) {
+      await db.from('household_settings').upsert({ owner, last_dinner_notice: today }, { onConflict: 'owner' });
+      // Old weeks' grocery checkmarks aren't needed.
+      await db.from('grocery_items').delete().eq('owner', owner).lt('week_start', P.addDays(week, -28));
+    }
   }
 }
 

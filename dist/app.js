@@ -1,5 +1,6 @@
 // Casa Yuffie: one household login, a profile per person.
-// Weigh-ins and sweet treats are per profile. Chores, errands, bills, recipes and photos are shared.
+// Weigh-ins and sweet treats are per profile. Chores, errands, bills, recipes, the dinner plan,
+// family reminders and photos are shared.
 
 const cfg = window.FAMILY_RHYTHM_CONFIG || {};
 const configured = /^https:\/\//.test(cfg.supabaseUrl || '') && !/PASTE_/.test(cfg.supabaseAnonKey || 'PASTE_');
@@ -21,7 +22,8 @@ let session = null;
 let profiles = [];
 let me = null;
 let chorePhotoUrls = {};
-const data = { weights: [], chores: [], errands: [], treatMenu: [], redemptions: [], bills: [], payments: [], recipes: [], photos: [] };
+const data = { weights: [], chores: [], errands: [], treatMenu: [], redemptions: [], bills: [], payments: [], recipes: [], photos: [],
+  familyReminders: [], plan: [], lastPlan: [], groceries: [], settings: null };
 
 // ---------- helpers ----------
 const dateKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -43,6 +45,7 @@ const hourLabel = h => `${h % 12 || 12} ${h < 12 ? 'AM' : 'PM'}`;
 const hourOptions = selected => ['<option value="">No reminder</option>']
   .concat(Array.from({ length: 24 }, (_, h) => `<option value="${h}"${h === selected ? ' selected' : ''}>${hourLabel(h)}</option>`))
   .join('');
+const hourOnlyOptions = selected => Array.from({ length: 24 }, (_, h) => `<option value="${h}"${h === selected ? ' selected' : ''}>${hourLabel(h)}</option>`).join('');
 
 // ---------- screens ----------
 function showGate(name) {
@@ -245,7 +248,7 @@ async function enterApp(profile) {
   $('#helloName').textContent = me.name;
   $('#weightUnit').value = store.get(`fr-unit-${me.id}`) || 'lb';
   showGate(null);
-  go('home');
+  go(viewFromHash() || 'home');
   await refresh();
   syncReminderProfile();
 }
@@ -253,7 +256,7 @@ async function enterApp(profile) {
 // ---------- data ----------
 async function refresh() {
   if (!me) return;
-  const [w, c, b, p, r, e, tm, tr] = await Promise.all([
+  const [w, c, b, p, r, e, tm, tr, fr, hs, mp, gi] = await Promise.all([
     sb.from('weigh_ins').select('*').eq('profile_id', me.id).order('date', { ascending: false }).limit(400),
     sb.from('chores').select('*').order('created_at'),
     sb.from('bills').select('*').eq('active', true).order('next_due'),
@@ -261,9 +264,15 @@ async function refresh() {
     sb.from('recipes').select('*').order('created_at', { ascending: false }).limit(500),
     sb.from('errands').select('*').order('created_at').limit(2000),
     sb.from('treat_menu').select('*').order('created_at'),
-    sb.from('treat_redemptions').select('*').eq('profile_id', me.id)
+    sb.from('treat_redemptions').select('*').eq('profile_id', me.id),
+    sb.from('family_reminders').select('*').eq('active', true).order('created_at'),
+    sb.from('household_settings').select('*').maybeSingle(),
+    ...planQueries()
   ]);
-  if (oops(w.error || c.error || b.error || p.error || r.error || e.error || tm.error || tr.error, 'Couldn’t reach the cloud. Check your connection.')) return;
+  if (oops(w.error || c.error || b.error || p.error || r.error || e.error || tm.error || tr.error || fr.error || hs.error || mp.error || gi.error,
+    'Couldn’t reach the cloud. Check your connection.')) return;
+  data.familyReminders = fr.data; data.settings = hs.data;
+  applyPlan(mp, gi);
   data.weights = w.data; data.chores = c.data; data.bills = b.data; data.payments = p.data; data.recipes = r.data;
   data.errands = e.data; data.treatMenu = tm.data; data.redemptions = tr.data;
   data.loaded = true;
@@ -337,7 +346,7 @@ function render() {
 
   renderHero(logged);
 
-  renderWeights(); renderChores(); renderErrands(); renderBills(); renderRecipes();
+  renderWeights(); renderChores(); renderErrands(); renderBills(); renderRecipes(); renderFamily();
 }
 const scheduledToday = () => WEIGH_DAYS.includes(new Date().getDay());
 function nextWeighIn() {
@@ -777,6 +786,8 @@ function renderRecipes() {
       : '<span class="recipe-thumb">❦</span>'}<div class="grow"><strong>${esc(r.title)}</strong><small>${esc(meta)}</small></div></button>`;
   }).join('') || `<div class="empty">${q ? 'No recipes match that.' : 'No recipes yet. Paste a link above to save your first one.'}</div>`;
   $$('[data-recipe]').forEach(b => b.onclick = () => openRecipe(data.recipes.find(r => r.id === b.dataset.recipe)));
+  renderPlan();
+  renderTonight();
 }
 $('#recipeSearch').oninput = renderRecipes;
 
@@ -829,6 +840,7 @@ function openRecipe(r) {
   ).join('') || '<p class="muted">None yet. Tap Edit to add them.</p>';
   $$('#recipeIngredients li, #recipeSteps li').forEach(li => li.onclick = () => li.classList.toggle('got'));
   $('#recipeNotes').value = r.notes || '';
+  $('#recipeRotation').checked = r.in_rotation !== false;
   $('#recipeView').hidden = false;
   $('#recipeEditForm').hidden = true;
   if (!$('#recipeDialog').open) $('#recipeDialog').showModal();
@@ -847,6 +859,11 @@ async function saveRecipe(changes) {
 
 $('#recipeNotes').onchange = async () => {
   if (await saveRecipe({ notes: $('#recipeNotes').value.trim() || null })) toast('Notes saved');
+};
+
+$('#recipeRotation').onchange = async () => {
+  const on = $('#recipeRotation').checked;
+  if (await saveRecipe({ in_rotation: on })) toast(on ? 'Back in the dinner shuffle' : 'Left out of the dinner shuffle');
 };
 
 $('#editRecipe').onclick = () => {
@@ -892,6 +909,303 @@ $('#deleteRecipe').onclick = async () => {
   data.recipes = data.recipes.filter(x => x.id !== r.id);
   renderRecipes();
   toast('Recipe deleted');
+  loadPlan();  // its nights on the dinner plan were freed up
+};
+
+// ---------- weekly dinner plan + grocery list (shared) ----------
+// Every Sunday the reminder job picks the week's dinners at random (scripts/send-reminders.mjs).
+// They can also be picked, swapped or shuffled here. Both use planner.js, so they pick the same way.
+// The grocery list is built from the planned recipes; grocery_items remembers what's checked off
+// and anything added by hand.
+const P = window.CasaPlanner;
+const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DEFAULT_SETTINGS = { dinner_days: [0, 1, 2, 3, 4], plan_hour: 9 };
+const thisWeek = () => P.weekStart(dateKey());
+const settings = () => ({ ...DEFAULT_SETTINGS, ...(data.settings || {}) });
+const recipeById = id => data.recipes.find(r => r.id === id);
+const plannedRecipes = () => data.plan.map(p => recipeById(p.recipe_id)).filter(Boolean);
+const shortDate = k => new Date(`${k}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+let planBusy = false;
+let groceryGroups = [];
+
+// This week's plan, last week's (so the shuffle can avoid repeats), and this week's grocery checks.
+function planQueries() {
+  const week = thisWeek();
+  return [
+    sb.from('meal_plan').select('day, recipe_id').gte('day', P.addDays(week, -7)).lte('day', P.addDays(week, 6)).order('day'),
+    sb.from('grocery_items').select('*').eq('week_start', week).order('created_at')
+  ];
+}
+function applyPlan(mp, gi) {
+  const week = thisWeek();
+  data.plan = mp.data.filter(p => p.day >= week);
+  data.lastPlan = mp.data.filter(p => p.day < week);
+  data.groceries = gi.data;
+}
+async function loadPlan() {
+  const [mp, gi] = await Promise.all(planQueries());
+  if (oops(mp.error || gi.error, 'Couldn’t load the dinner plan')) return;
+  applyPlan(mp, gi);
+  renderPlan();
+  renderTonight();
+}
+
+function renderPlan() {
+  const week = thisWeek(), today = dateKey();
+  const nights = new Set(settings().dinner_days);
+  const pool = P.dinnerPool(data.recipes);
+  $('#planWeekLabel').textContent = `Week of ${shortDate(week)}`;
+  $('#shufflePlan').hidden = !pool.length;
+  $('#shufflePlan').textContent = data.plan.length ? '🔀 Shuffle' : '🔀 Pick dinners';
+
+  if (!data.recipes.length) {
+    $('#planNights').innerHTML = '<div class="empty">Save a few recipes below. Every Sunday, dinners for the week get picked from them.</div>';
+  } else if (!pool.length) {
+    $('#planNights').innerHTML = '<div class="empty">Every recipe is left out of the dinner shuffle. Open one and check “In the dinner shuffle”.</div>';
+  } else {
+    const shown = P.weekDays(week).filter((d, i) => nights.has(i) || data.plan.some(p => p.day === d));
+    $('#planNights').innerHTML = shown.map(d => {
+      const r = recipeById(data.plan.find(p => p.day === d)?.recipe_id);
+      const label = `<span class="night-day${d === today ? ' today' : ''}"><strong>${DAY_SHORT[P.weekday(d)]}</strong><small>${Number(d.slice(8))}</small></span>`;
+      const cls = `night${d < today ? ' past' : ''}`;
+      if (!r) return `<div class="${cls}">${label}<button class="night-pick" data-pick-night="${d}">＋ Pick a dinner</button></div>`;
+      return `<div class="${cls}">${label}<button class="night-recipe" data-open-plan="${r.id}"><strong>${esc(r.title)}</strong>${r.total_minutes ? `<small>${minutesLabel(r.total_minutes)}</small>` : ''}</button>`
+        + `<button class="night-btn" data-swap-night="${d}" aria-label="Swap ${escAttr(r.title)} for another recipe" title="Swap">↻</button>`
+        + `<button class="night-btn" data-clear-night="${d}" aria-label="No dinner on ${DAY_SHORT[P.weekday(d)]}" title="Remove">×</button></div>`;
+    }).join('') || '<div class="empty">No dinner nights chosen. Pick some below.</div>';
+  }
+  $$('[data-open-plan]').forEach(b => b.onclick = () => openRecipe(recipeById(b.dataset.openPlan)));
+  $$('[data-pick-night]').forEach(b => b.onclick = () => fillNights([b.dataset.pickNight]));
+  $$('[data-swap-night]').forEach(b => b.onclick = () => fillNights([b.dataset.swapNight], true));
+  $$('[data-clear-night]').forEach(b => b.onclick = async () => {
+    const { error } = await sb.from('meal_plan').delete().eq('day', b.dataset.clearNight);
+    if (!oops(error, 'Couldn’t change the plan')) loadPlan();
+  });
+  renderPlanSettings();
+  renderGroceries();
+}
+
+// Pick a random recipe for each night. Swapping always lands on a different recipe when there's one.
+async function fillNights(dayKeys, swapping = false) {
+  const pool = P.dinnerPool(data.recipes);
+  if (planBusy || !dayKeys.length) return;
+  if (!pool.length) return toast('Add a recipe first');
+  planBusy = true;
+  const taken = new Set(data.plan.filter(p => swapping || !dayKeys.includes(p.day)).map(p => p.recipe_id));
+  const avoid = new Set(data.lastPlan.map(p => p.recipe_id));
+  const picks = P.pickDinners(pool, dayKeys.length, { avoid, taken });
+  const rows = dayKeys.map((day, i) => ({ owner: session.user.id, day, recipe_id: picks[i].id }));
+  const { error } = await sb.from('meal_plan').upsert(rows, { onConflict: 'owner,day' });
+  planBusy = false;
+  if (oops(error, 'Couldn’t save the dinner plan')) return;
+  await loadPlan();
+  toast(swapping ? `How about ${picks[0].title}?` : dayKeys.length > 1 ? 'Dinners picked. Grocery list updated.' : `${picks[0].title} it is`);
+}
+
+// Shuffle re-picks tonight and the rest of the week (past nights stay as they were).
+$('#shufflePlan').onclick = () => {
+  const today = dateKey(), nights = new Set(settings().dinner_days);
+  const days = P.weekDays(thisWeek()).filter((d, i) => d >= today && (nights.has(i) || data.plan.some(p => p.day === d)));
+  if (!days.length) return toast('No dinner nights left this week');
+  fillNights(days);
+};
+
+function renderPlanSettings() {
+  const s = settings();
+  $('#dinnerDayChips').innerHTML = DAY_SHORT.map((d, i) => {
+    const on = s.dinner_days.includes(i);
+    return `<button type="button" class="day-chip${on ? ' on' : ''}" data-dinner-day="${i}" aria-pressed="${on}">${d}</button>`;
+  }).join('');
+  $('#planHour').innerHTML = hourOnlyOptions(s.plan_hour);
+  $$('[data-dinner-day]').forEach(b => b.onclick = () => {
+    const day = Number(b.dataset.dinnerDay);
+    const next = new Set(settings().dinner_days);
+    next.has(day) ? next.delete(day) : next.add(day);
+    if (!next.size) return toast('Keep at least one dinner night');
+    saveSettings({ dinner_days: [...next].sort() });
+  });
+}
+$('#planHour').onchange = async () => {
+  if (await saveSettings({ plan_hour: Number($('#planHour').value) })) toast(`Dinners get picked Sundays at ${hourLabel(Number($('#planHour').value))}`);
+};
+
+async function saveSettings(changes) {
+  const next = { ...settings(), ...changes };
+  const { data: saved, error } = await sb.from('household_settings')
+    .upsert({ owner: session.user.id, dinner_days: next.dinner_days, plan_hour: next.plan_hour }, { onConflict: 'owner' })
+    .select().single();
+  if (oops(error, 'Couldn’t save that setting')) return null;
+  data.settings = saved;
+  renderPlan();
+  return saved;
+}
+
+function renderGroceries() {
+  const checks = new Map(data.groceries.filter(g => !g.custom).map(g => [g.item_key, g.checked]));
+  groceryGroups = P.groceryList(plannedRecipes()).map(g => ({
+    ...g, items: g.items.map(i => ({ ...i, checked: !!checks.get(i.key) }))
+  }));
+  const extras = data.groceries.filter(g => g.custom).map(g => ({ key: g.item_key, id: g.id, name: g.name, amount: '', recipes: [], checked: g.checked, custom: true }));
+  if (extras.length) groceryGroups.splice(groceryGroups.findIndex(g => g.aisle === 'Staples') >>> 0, 0, { aisle: 'Added by you', items: extras });
+
+  const left = groceryGroups.flatMap(g => g.items).filter(i => !i.checked).length;
+  $('#shareGroceries').hidden = !left;
+  $('#groceryList').innerHTML = groceryGroups.map(g => {
+    const staples = g.aisle === 'Staples';
+    const items = [...g.items].sort((a, b) => a.checked - b.checked);
+    return `<div class="grocery-group${staples ? ' staples' : ''}"><p class="grocery-aisle">${staples ? 'Check the pantry' : esc(g.aisle)}</p>${items.map(i =>
+      `<div class="grocery-row${i.checked ? ' got' : ''}"><button class="grocery-item" data-grocery="${escAttr(i.key)}" aria-pressed="${i.checked}"><span class="box" aria-hidden="true"></span><span class="grow"><strong>${esc(i.name)}</strong>${
+        [i.amount, i.recipes.join(', ')].some(Boolean) ? `<small>${esc([i.amount, i.recipes.join(', ')].filter(Boolean).join(' · '))}</small>` : ''
+      }</span></button>${i.custom ? `<button class="delete" data-delete-grocery="${i.id}" aria-label="Remove ${escAttr(i.name)}">×</button>` : ''}</div>`
+    ).join('')}</div>`;
+  }).join('') || `<div class="empty">${data.plan.length ? 'The planned recipes don’t have ingredients yet. Open one and tap Edit to add them.' : 'Your grocery list shows up here once dinners are picked.'}</div>`;
+
+  $$('[data-grocery]').forEach(b => b.onclick = () => toggleGrocery(b.dataset.grocery));
+  $$('[data-delete-grocery]').forEach(b => b.onclick = async () => {
+    const { error } = await sb.from('grocery_items').delete().eq('id', b.dataset.deleteGrocery);
+    if (!oops(error)) loadPlan();
+  });
+}
+
+// Checks show right away, then save. Another phone sees them on its next refresh.
+async function toggleGrocery(key) {
+  const row = data.groceries.find(g => g.item_key === key);
+  const checked = !row?.checked;
+  const week = thisWeek();
+  if (row) row.checked = checked; else data.groceries.push({ item_key: key, week_start: week, checked, custom: false });
+  renderGroceries();
+  const { data: saved, error } = await sb.from('grocery_items')
+    .upsert({ owner: session.user.id, week_start: week, item_key: key, checked }, { onConflict: 'owner,week_start,item_key' })
+    .select().single();
+  if (oops(error, 'Couldn’t save that')) return loadPlan();
+  data.groceries = data.groceries.map(g => g.item_key === key ? saved : g);
+}
+
+$('#groceryForm').onsubmit = async e => {
+  e.preventDefault();
+  const name = $('#groceryName').value.trim();
+  if (!name) return;
+  const { error } = await sb.from('grocery_items').insert({ week_start: thisWeek(), item_key: `custom:${crypto.randomUUID()}`, name, custom: true });
+  if (oops(error, 'Couldn’t add that')) return;
+  $('#groceryName').value = '';
+  loadPlan();
+};
+
+// Share what's still needed (Messages, Notes...), or copy it where sharing isn't available.
+function groceryText() {
+  const lines = [`Groceries for the week of ${shortDate(thisWeek())}`];
+  for (const g of groceryGroups) {
+    const items = g.items.filter(i => !i.checked);
+    if (!items.length) continue;
+    lines.push('', g.aisle === 'Staples' ? 'Check the pantry' : g.aisle);
+    for (const i of items) lines.push(`• ${i.name}${i.amount ? `, ${i.amount}` : ''}`);
+  }
+  return lines.join('\n');
+}
+$('#shareGroceries').onclick = async () => {
+  const text = groceryText();
+  if (navigator.share) {
+    try { await navigator.share({ title: 'Grocery list', text }); return; } catch (err) { if (err.name === 'AbortError') return; }
+  }
+  try { await navigator.clipboard.writeText(text); toast('Grocery list copied'); } catch { toast('Couldn’t copy the list'); }
+};
+
+function renderTonight() {
+  const r = recipeById(data.plan.find(p => p.day === dateKey())?.recipe_id);
+  $('#tonightCard').hidden = !r;
+  if (!r) return;
+  $('#tonightTitle').textContent = r.title;
+  $('#tonightNote').textContent = `Tonight’s dinner${r.total_minutes ? ` · ${minutesLabel(r.total_minutes)}` : ''}`;
+  $('#tonightCard').onclick = () => openRecipe(r);
+}
+
+// ---------- family reminders (weekly, shared) ----------
+// Each one repeats on its days at its hour (New York time), for everyone or one person.
+let editingFamily = null;
+let familyDays = new Set();
+
+function daysLabel(days) {
+  const d = [...days].sort().join();
+  if (d === '0,1,2,3,4,5,6') return 'Every day';
+  if (d === '1,2,3,4,5') return 'Weekdays';
+  if (d === '0,6') return 'Weekends';
+  return [...days].sort().map(i => DAY_SHORT[i]).join(', ');
+}
+// Days until it next comes up: 0 if today and its time hasn't passed, else the next matching day.
+function daysUntilReminder(rem) {
+  const now = new Date(), dow = now.getDay();
+  return Math.min(...rem.days.map(d => {
+    const diff = (d - dow + 7) % 7;
+    return diff === 0 && rem.remind_hour < now.getHours() ? 7 : diff;
+  }));
+}
+
+function renderFamily() {
+  const dow = new Date().getDay();
+  const list = [...data.familyReminders].sort((a, b) => daysUntilReminder(a) - daysUntilReminder(b) || a.remind_hour - b.remind_hour);
+  $('#familyReminderList').innerHTML = list.map(r => {
+    const who = (r.profile_id && profileName(r.profile_id)) || 'Everyone';
+    return `<button class="list-card family-card" data-family="${r.id}"><span class="summary-icon">🔔</span><div class="grow"><strong>${esc(r.name)}</strong><small>${esc(`${daysLabel(r.days)} · ${hourLabel(r.remind_hour)} · ${who}`)}</small></div>${r.days.includes(dow) ? '<span class="pill">Today</span>' : ''}</button>`;
+  }).join('') || '<div class="empty">Weekly things like trash night, practice or library day. Everyone gets a reminder on their phone.</div>';
+  $$('[data-family]').forEach(b => b.onclick = () => openFamily(data.familyReminders.find(r => r.id === b.dataset.family)));
+}
+
+function renderFamilyDays() {
+  $('#familyDays').innerHTML = DAY_SHORT.map((d, i) =>
+    `<button type="button" class="day-chip${familyDays.has(i) ? ' on' : ''}" data-family-day="${i}" aria-pressed="${familyDays.has(i)}">${d}</button>`).join('');
+  $$('[data-family-day]').forEach(b => b.onclick = () => {
+    const day = Number(b.dataset.familyDay);
+    familyDays.has(day) ? familyDays.delete(day) : familyDays.add(day);
+    renderFamilyDays();
+  });
+}
+
+function openFamily(rem = null) {
+  editingFamily = rem;
+  familyDays = new Set(rem?.days || [new Date().getDay()]);
+  $('#familyDialogEyebrow').textContent = rem ? 'Every week' : 'New family reminder';
+  $('#familyDialogTitle').textContent = rem ? 'Edit reminder' : 'Add a reminder';
+  $('#familyName').value = rem?.name || '';
+  $('#familyNote').value = rem?.note || '';
+  $('#familyHour').innerHTML = hourOnlyOptions(rem?.remind_hour ?? 18);
+  $('#familyFor').innerHTML = '<option value="">Everyone</option>' + profiles.map(p =>
+    `<option value="${p.id}"${rem?.profile_id === p.id ? ' selected' : ''}>${esc(p.name)}</option>`).join('');
+  $('#familyError').hidden = true;
+  $('#deleteFamily').hidden = !rem;
+  renderFamilyDays();
+  $('#familyDialog').showModal();
+}
+$('#addFamilyReminder').onclick = () => openFamily();
+
+$('#familyForm').onsubmit = async e => {
+  e.preventDefault();
+  if (cancelled(e)) return;
+  if (!familyDays.size) { $('#familyError').textContent = 'Pick at least one day.'; $('#familyError').hidden = false; return; }
+  const row = {
+    name: $('#familyName').value.trim(),
+    note: $('#familyNote').value.trim() || null,
+    days: [...familyDays].sort(),
+    remind_hour: Number($('#familyHour').value),
+    profile_id: $('#familyFor').value || null
+  };
+  // A new day or time can still remind later today.
+  if (!editingFamily || editingFamily.remind_hour !== row.remind_hour || daysLabel(editingFamily.days) !== daysLabel(row.days)) row.last_sent_on = null;
+  const { error } = editingFamily
+    ? await sb.from('family_reminders').update(row).eq('id', editingFamily.id)
+    : await sb.from('family_reminders').insert(row);
+  if (oops(error, 'Couldn’t save that reminder')) return;
+  $('#familyDialog').close();
+  toast(editingFamily ? 'Reminder updated' : `Reminder set: ${daysLabel(row.days)} at ${hourLabel(row.remind_hour)}`);
+  refresh();
+};
+
+$('#deleteFamily').onclick = async () => {
+  if (!editingFamily || !confirm(`Delete “${editingFamily.name}”?`)) return;
+  const { error } = await sb.from('family_reminders').delete().eq('id', editingFamily.id);
+  if (oops(error, 'Couldn’t delete that reminder')) return;
+  $('#familyDialog').close();
+  toast('Reminder deleted');
+  refresh();
 };
 
 // ---------- forms ----------
@@ -1219,11 +1533,11 @@ async function renderReminderCard() {
   if (sub) {
     btn.textContent = 'Test';
     status.textContent = me.weigh_reminders === false
-      ? `On for ${me.name} on this phone: chores and bills at their reminder times. Weigh-in reminders are off in ${me.name}’s profile.`
-      : `On for ${me.name} on this phone. Mondays and Fridays at 8am, plus chores and bills at their reminder times.`;
+      ? `On for ${me.name} on this phone: family reminders, Sunday dinner plans, and chores and bills at their reminder times. Weigh-in reminders are off in ${me.name}’s profile.`
+      : `On for ${me.name} on this phone. Mondays and Fridays at 8am, family reminders, Sunday dinner plans, plus chores and bills at their reminder times.`;
   } else {
     btn.textContent = 'Turn on';
-    status.textContent = 'Weigh-in mornings, plus each chore at the time you choose.';
+    status.textContent = 'Weigh-in mornings, family reminders, Sunday dinner plans, plus each chore at the time you choose.';
   }
 }
 
@@ -1261,6 +1575,18 @@ document.addEventListener('visibilitychange', () => {
     $('#todayLabel').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
     refresh();
   }
+});
+
+// A notification can open a tab, e.g. Sunday's dinner plan opens Recipes (./#recipes).
+function viewFromHash(url = location.href) {
+  const id = new URL(url).hash.slice(1);
+  if (id) history.replaceState(null, '', location.pathname + location.search);
+  return id && $(`.view#${CSS.escape(id)}`) ? id : null;
+}
+navigator.serviceWorker?.addEventListener('message', e => {
+  if (e.data?.type !== 'open' || !me) return;
+  const id = viewFromHash(e.data.url);
+  if (id) go(id);
 });
 
 boot();

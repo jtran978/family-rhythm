@@ -1,5 +1,5 @@
-const CACHE = 'family-rhythm-v18';
-const SHELL = ['./', './index.html', './styles.css', './app.js', './config.js', './manifest.webmanifest', './icon.svg', './icon-180.png', './icon-512.png'];
+const CACHE = 'family-rhythm-v19';
+const SHELL = ['./', './index.html', './styles.css', './app.js', './config.js', './planner.js', './manifest.webmanifest', './icon.svg', './icon-180.png', './icon-512.png'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)));
@@ -50,7 +50,11 @@ self.addEventListener('notificationclick', event => {
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const client of windows) {
-      if (client.url.startsWith(self.registration.scope)) { await client.focus(); return; }
+      if (client.url.startsWith(self.registration.scope)) {
+        await client.focus();
+        client.postMessage({ type: 'open', url: target });  // e.g. open the Recipes tab
+        return;
+      }
     }
     await self.clients.openWindow(target);
   })());

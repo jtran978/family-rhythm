@@ -172,3 +172,54 @@ body.no-weigh .summary-grid .summary-card.plain{grid-column:1/-1;min-height:auto
 .chore-card .grow{min-width:0;overflow-wrap:break-word}
 .chore-card .time-select.compact{max-width:92px;padding:7px 4px;flex:none}
 .chore-card .delete{padding:0 2px}
+
+/* ---- family reminders ---- */
+.family-card{width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer}
+.family-card .summary-icon{font-size:20px}
+.tonight-link,#tonightCard{background:#f7ecd5;border-color:#ecdcb8}
+.day-chips{display:flex;flex-wrap:wrap;gap:6px}
+.day-chip{border:1.5px solid var(--line);background:white;border-radius:999px;padding:8px 11px;font:inherit;font-size:13px;font-weight:800;color:var(--muted);cursor:pointer;min-width:46px}
+.day-chip.on{background:var(--sage);border-color:var(--sage);color:#fff}
+.dialog-card select{appearance:auto}
+
+/* ---- dinner plan ---- */
+.plan-card{background:var(--sage-soft);border-radius:24px;padding:18px;display:grid;gap:12px}
+.plan-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.plan-head h3{font-family:Georgia,serif;font-weight:500;font-size:24px;margin:4px 0 0}
+.shuffle-btn{background:var(--card);color:var(--sage);padding:10px 14px;font-size:14px;white-space:nowrap}
+.plan-nights{display:grid;gap:8px}
+.plan-nights .empty{background:rgba(255,255,255,.5)}
+.night{display:flex;align-items:center;gap:8px;background:var(--card);border-radius:16px;padding:8px 8px 8px 10px}
+.night.past{opacity:.55}
+.night-day{flex:none;width:42px;text-align:center;line-height:1.1}
+.night-day strong{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--sage)}
+.night-day small{font-size:17px;font-weight:800;color:var(--ink)}
+.night-day.today{background:var(--sage);border-radius:12px;padding:5px 0}
+.night-day.today strong,.night-day.today small{color:#fff}
+.night-recipe{flex:1;min-width:0;border:0;background:none;text-align:left;font:inherit;color:inherit;cursor:pointer;padding:6px 2px}
+.night-recipe strong{display:block;overflow-wrap:break-word}
+.night-recipe small{display:block;color:var(--muted);margin-top:2px}
+.night-pick{flex:1;border:1.5px dashed #b9c9b6;background:transparent;border-radius:12px;padding:12px;font:inherit;font-weight:800;color:var(--sage);cursor:pointer;text-align:left}
+.night-btn{flex:none;width:34px;height:34px;border:0;border-radius:10px;background:#f1ece2;color:var(--muted);font-size:17px;cursor:pointer}
+.plan-settings summary{cursor:pointer;font-size:13px;font-weight:800;color:var(--sage);padding:4px 2px}
+.plan-settings[open] summary{margin-bottom:8px}
+.plan-settings .small-note{margin:2px 2px 8px}
+.plan-hour{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:14px;font-weight:700}
+
+/* ---- grocery list ---- */
+.grocery-list{display:grid;gap:14px}
+.grocery-group{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:6px 8px 8px}
+.grocery-group.staples{background:transparent;border-style:dashed}
+.grocery-aisle{margin:8px 8px 4px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--sage)}
+.grocery-row{display:flex;align-items:center}
+.grocery-item{flex:1;display:flex;align-items:flex-start;gap:12px;border:0;background:none;text-align:left;font:inherit;color:inherit;cursor:pointer;padding:9px 8px;border-radius:12px;min-width:0}
+.grocery-item .grow{flex:1;min-width:0}
+.grocery-item strong{display:block;font-weight:700}
+.grocery-item small{display:block;color:var(--muted);font-size:12px;margin-top:2px;overflow-wrap:break-word}
+.grocery-item .box{flex:none;width:20px;height:20px;margin-top:1px;border:2px solid var(--sage);border-radius:6px;display:grid;place-items:center;color:#fff;font-size:13px}
+.grocery-row.got .grocery-item{opacity:.45}
+.grocery-row.got strong{text-decoration:line-through}
+.grocery-row.got .box{background:var(--sage)}
+.grocery-row.got .box::after{content:"✓"}
+.grocery-add{margin-top:12px}
+.rotation-row{margin:12px 0 2px}

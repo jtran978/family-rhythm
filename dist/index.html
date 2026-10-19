@@ -121,7 +121,11 @@
           <small id="billSummaryNext">Add your household bills</small>
         </button>
       </div>
+      <button class="list-card photo-link" id="tonightCard" hidden><span class="summary-icon">🍽</span><div class="grow"><strong id="tonightTitle"></strong><small id="tonightNote">Tonight’s dinner</small></div><span aria-hidden="true">›</span></button>
       <button class="list-card photo-link" data-go="photos"><span class="summary-icon">🔒</span><div class="grow"><strong>Photo library</strong><small>Locked with the photo PIN</small></div><span aria-hidden="true">›</span></button>
+
+      <div class="section-heading"><h2>Family this week</h2><button class="text-button" id="addFamilyReminder">＋ Add</button></div>
+      <div id="familyReminderList" class="stack"></div>
 
       <div class="section-heading weigh-only"><h2>Recent weigh-ins</h2><button class="text-button" data-go="weighins">See all</button></div>
       <div id="recentWeights" class="stack weigh-only"></div>
@@ -130,7 +134,7 @@
       <div class="list-card reminder-card">
         <div class="grow">
           <strong id="reminderTitle">Gentle reminders</strong>
-          <small id="reminderStatus">Weigh-in mornings, plus each chore at the time you choose.</small>
+          <small id="reminderStatus">Weigh-in mornings, family reminders, Sunday dinner plans, plus each chore at the time you choose.</small>
         </div>
         <button id="enableReminders" class="primary small">Turn on</button>
       </div>
@@ -195,7 +199,31 @@
     </section>
 
     <section id="recipes" class="view" aria-labelledby="recipes-title">
-      <div class="page-heading"><p class="eyebrow">What’s for dinner</p><h2 id="recipes-title">Recipes</h2><p>Paste a link to a recipe. The ingredients and steps are saved here, without the ads and life stories.</p></div>
+      <div class="page-heading"><p class="eyebrow">What’s for dinner</p><h2 id="recipes-title">Recipes</h2><p>Every Sunday, dinners for the week are picked at random from your recipe box, with a grocery list to match.</p></div>
+
+      <div class="plan-card">
+        <div class="plan-head">
+          <div><p class="eyebrow" id="planWeekLabel">This week</p><h3>This week’s dinners</h3></div>
+          <button id="shufflePlan" class="ghost shuffle-btn" hidden>🔀 Shuffle</button>
+        </div>
+        <div id="planNights" class="plan-nights"></div>
+        <details class="plan-settings">
+          <summary>Dinner nights and Sunday pick time</summary>
+          <p class="muted small-note">Dinners are picked for these nights:</p>
+          <div id="dinnerDayChips" class="day-chips"></div>
+          <label class="plan-hour">Pick on Sundays at <select id="planHour" class="time-select compact"></select></label>
+        </details>
+      </div>
+
+      <div class="section-heading"><h2>Grocery list</h2><button class="text-button" id="shareGroceries" hidden>Share list</button></div>
+      <div id="groceryList" class="grocery-list"></div>
+      <form id="groceryForm" class="inline-form grocery-add">
+        <input id="groceryName" required maxlength="80" placeholder="Add something else" aria-label="Grocery item" autocomplete="off" />
+        <button class="primary" type="submit">Add</button>
+      </form>
+
+      <div class="section-heading"><h2>Recipe box</h2></div>
+      <p class="muted small-note">Paste a link to a recipe. The ingredients and steps are saved here, without the ads and life stories.</p>
       <form id="recipeForm" class="inline-form">
         <input id="recipeUrl" type="url" required placeholder="Paste a recipe link" aria-label="Recipe link" autocomplete="off" />
         <button class="primary" type="submit" id="recipeSave">Save</button>
@@ -300,6 +328,26 @@
     </form>
   </dialog>
 
+  <dialog id="familyDialog">
+    <form id="familyForm" method="dialog" class="dialog-card">
+      <button class="dialog-close" value="cancel" formnovalidate aria-label="Close">×</button>
+      <p class="eyebrow" id="familyDialogEyebrow">Every week</p>
+      <h2 id="familyDialogTitle">Add a reminder</h2>
+      <div class="dialog-fields">
+        <label>What<input id="familyName" required maxlength="80" placeholder="Trash night, soccer practice…" /></label>
+        <div><span class="field-label">Which days</span><div id="familyDays" class="day-chips"></div></div>
+        <div class="field-pair">
+          <label>At<select id="familyHour"></select></label>
+          <label>For<select id="familyFor"></select></label>
+        </div>
+        <label>Note <small class="muted">optional, shows in the reminder</small><input id="familyNote" maxlength="200" placeholder="Bins out by the curb" /></label>
+      </div>
+      <p id="familyError" class="form-error" hidden></p>
+      <button type="submit" value="save" class="primary full">Save reminder</button>
+      <button type="button" id="deleteFamily" class="text-button danger center" hidden>Delete this reminder</button>
+    </form>
+  </dialog>
+
   <dialog id="recipeDialog" class="sheet">
     <div class="dialog-card">
       <button type="button" class="dialog-close" id="closeRecipe" aria-label="Close">×</button>
@@ -309,6 +357,7 @@
         <h2 id="recipeTitle"></h2>
         <p class="muted" id="recipeMeta"></p>
         <a id="recipeLink" class="text-button" target="_blank" rel="noopener noreferrer">Open the original ↗</a>
+        <label class="check-row rotation-row"><input type="checkbox" id="recipeRotation" /> In the dinner shuffle <small class="muted">Unchecked: never picked for the week (good for desserts and sides).</small></label>
         <h3>Ingredients</h3>
         <p class="muted small-note">Tap to cross off as you go.</p>
         <ul id="recipeIngredients" class="ingredients"></ul>
@@ -377,6 +426,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
   <script src="./config.js"></script>
+  <script src="./planner.js"></script>
   <script src="./app.js"></script>
   <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');</script>
 </body>
